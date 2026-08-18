@@ -11,6 +11,7 @@
  */
 import { error } from './http';
 import { login, logout, me, sesionDe } from './auth';
+import { crearCliente, editarCliente, eliminarCliente, listarClientes, verCliente } from './rutas/clientes';
 import type { Contexto, Entorno, Sesion } from './tipos';
 
 type Manejador = (ctx: Contexto, sesion: Sesion) => Promise<Response> | Response;
@@ -31,6 +32,12 @@ const RUTAS: Ruta[] = [
   ruta('POST', '/api/auth/login', login, true),
   ruta('POST', '/api/auth/logout', logout, true),
   ruta('GET', '/api/me', me),
+
+  ruta('GET', '/api/clientes', listarClientes),
+  ruta('POST', '/api/clientes', crearCliente),
+  ruta('GET', '/api/clientes/:id', verCliente),
+  ruta('PATCH', '/api/clientes/:id', editarCliente),
+  ruta('DELETE', '/api/clientes/:id', eliminarCliente),
 ];
 
 interface Coincidencia {
