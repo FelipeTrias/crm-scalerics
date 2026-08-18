@@ -2,62 +2,30 @@
  * Bitacora de contactos con el cliente.
  *
  * Es la tabla que hoy no existe en ningun lado: lo que cada vendedor tiene en
- * la cabeza o en su Excel. El alta tiene que ser barata — cuatro campos, sin
- * campos obligatorios mas alla del tipo — porque se completa parado en la
- * calle. Si registrar una visita cuesta trabajo, nadie la registra y el
- * sistema no sirve para nada.
+ * la cabeza o en su Excel. El alta tiene que ser barata — cuatro campos, y solo
+ * el tipo obligatorio — porque se completa parado en la calle. Si registrar una
+ * visita cuesta trabajo, nadie la registra y el sistema no sirve para nada.
  */
-import { enteroPositivo, error, esUnoDe, json, leerBody, textoNoVacio } from '../http';
-import { esAdmin } from '../permisos';
+import { clienteAccesible, esRespuesta } from '../acceso';
+import {
+  enteroPositivo,
+  error,
+  esUnoDe,
+  fechaIsoValida,
+  json,
+  leerBody,
+  textoNoVacio,
+  textoOpcional,
+} from '../http';
 import { TIPOS_INTERACCION } from '../reglas';
 import type { Contexto, Sesion } from '../tipos';
-
-interface ClienteMinimo {
-  id: number;
-  vendedor_id: number;
-}
-
-/**
- * Resuelve el cliente de la ruta comprobando el alcance del usuario.
- *
- * Devuelve una Response cuando hay que cortar, o el cliente cuando se puede
- * seguir. Se distingue a proposito entre lectura y escritura: al leer se
- * responde 404 para no confirmar que el cliente existe, al escribir 403 porque
- * el mensaje le sirve al vendedor para entender que paso.
- */
-async function resolverCliente(
-  ctx: Contexto,
-  sesion: Sesion,
-  modo: 'lectura' | 'escritura',
-): Promise<ClienteMinimo | Response> {
-  const id = enteroPositivo(ctx.params['id']);
-  if (!id) return error('Id de cliente invalido', 400);
-
-  const cliente = await ctx.env.DB.prepare('SELECT id, vendedor_id FROM clientes WHERE id = ? AND eliminado = 0')
-    .bind(id)
-    .first<ClienteMinimo>();
-
-  if (!cliente) return error('Cliente no encontrado', 404);
-
-  if (!esAdmin(sesion) && cliente.vendedor_id !== sesion.id) {
-    return modo === 'lectura'
-      ? error('Cliente no encontrado', 404)
-      : error('Ese cliente no es de tu cartera', 403);
-  }
-
-  return cliente;
-}
-
-function esRespuesta(x: ClienteMinimo | Response): x is Response {
-  return x instanceof Response;
-}
 
 // ---------------------------------------------------------------------------
 //  GET /api/clientes/:id/interacciones
 // ---------------------------------------------------------------------------
 
 export async function listarInteracciones(ctx: Contexto, sesion: Sesion): Promise<Response> {
-  const cliente = await resolverCliente(ctx, sesion, 'lectura');
+  const cliente = await clienteAccesible(ctx.env, enteroPositivo(ctx.params['id']), sesion, 'lectura');
   if (esRespuesta(cliente)) return cliente;
 
   const { results } = await ctx.env.DB.prepare(
@@ -86,15 +54,8 @@ interface CuerpoInteraccion {
   proxima_accion_fecha?: unknown;
 }
 
-/** Solo acepta YYYY-MM-DD, que es como SQLite compara y ordena bien. */
-function fechaValida(valor: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) return false;
-  const d = new Date(valor + 'T00:00:00Z');
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === valor;
-}
-
 export async function crearInteraccion(ctx: Contexto, sesion: Sesion): Promise<Response> {
-  const cliente = await resolverCliente(ctx, sesion, 'escritura');
+  const cliente = await clienteAccesible(ctx.env, enteroPositivo(ctx.params['id']), sesion, 'escritura');
   if (esRespuesta(cliente)) return cliente;
 
   const body = await leerBody<CuerpoInteraccion>(ctx.request);
@@ -109,11 +70,9 @@ export async function crearInteraccion(ctx: Contexto, sesion: Sesion): Promise<R
   let proximaFecha: string | null = null;
   if (textoNoVacio(body.proxima_accion_fecha)) {
     const valor = body.proxima_accion_fecha.trim();
-    if (!fechaValida(valor)) return error('La fecha de la proxima accion tiene que ser AAAA-MM-DD', 400);
+    if (!fechaIsoValida(valor)) return error('La fecha de la proxima accion tiene que ser AAAA-MM-DD', 400);
     proximaFecha = valor;
   }
-
-  const opcional = (v: unknown): string | null => (textoNoVacio(v) ? v.trim() : null);
 
   // La interaccion queda a nombre de quien la registra, no del vendedor
   // asignado. Si el dueño llama a un cliente, tiene que verse que llamo el.
@@ -125,9 +84,9 @@ export async function crearInteraccion(ctx: Contexto, sesion: Sesion): Promise<R
       cliente.id,
       sesion.id,
       body.tipo,
-      opcional(body.resultado),
-      opcional(body.notas),
-      opcional(body.proxima_accion),
+      textoOpcional(body.resultado),
+      textoOpcional(body.notas),
+      textoOpcional(body.proxima_accion),
       proximaFecha,
     )
     .run();

@@ -43,3 +43,19 @@ export function enteroPositivo(valor: unknown): number | null {
   const n = Number(valor);
   return Number.isInteger(n) && n > 0 ? n : null;
 }
+
+/**
+ * Acepta unicamente AAAA-MM-DD, que es el formato que SQLite compara y ordena
+ * bien. La vuelta por Date descarta fechas que pasan la expresion regular pero
+ * no existen, como 2026-02-30.
+ */
+export function fechaIsoValida(valor: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) return false;
+  const d = new Date(valor + 'T00:00:00Z');
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === valor;
+}
+
+/** Devuelve el texto recortado, o null si vino vacio o no es texto. */
+export function textoOpcional(valor: unknown): string | null {
+  return textoNoVacio(valor) ? valor.trim() : null;
+}
