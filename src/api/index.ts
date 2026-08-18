@@ -21,6 +21,7 @@ import {
 } from './rutas/clientes';
 import { editarAlerta, generarAlertasAhora, listarAlertas } from './rutas/alertas';
 import { editarUsuario, listarVendedores } from './rutas/usuarios';
+import { crearPedido, editarPedido, listarPedidos, listarProductos } from './rutas/pedidos';
 import { crearContacto, editarContacto } from './rutas/contactos';
 import { verDashboard } from './rutas/dashboard';
 import { crearInteraccion, listarInteracciones } from './rutas/interacciones';
@@ -71,6 +72,11 @@ const RUTAS: Ruta[] = [
 
   ruta('POST', '/api/clientes/:id/contactos', crearContacto),
   ruta('PATCH', '/api/contactos/:id', editarContacto),
+
+  ruta('GET', '/api/productos', listarProductos),
+  ruta('GET', '/api/clientes/:id/pedidos', listarPedidos),
+  ruta('POST', '/api/clientes/:id/pedidos', crearPedido),
+  ruta('PATCH', '/api/pedidos/:id', editarPedido),
 
   ruta('GET', '/api/dashboard', verDashboard),
 ];

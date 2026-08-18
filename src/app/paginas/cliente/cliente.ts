@@ -1,8 +1,8 @@
 import { Component, effect, inject, input, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api, mensajeDeError } from '../../nucleo/api';
-import { colorCompra, colorContacto, enlaceWhatsapp, fechaCorta } from '../../nucleo/formato';
-import type { FichaCliente } from '../../nucleo/modelos';
+import { colorCompra, colorContacto, enlaceWhatsapp, fechaCorta, moneda } from '../../nucleo/formato';
+import type { FichaCliente, Pedido } from '../../nucleo/modelos';
 import { Sesion } from '../../nucleo/sesion';
 import { RegistrarContacto } from './registrar-contacto';
 
@@ -79,6 +79,40 @@ import { RegistrarContacto } from './registrar-contacto';
           }
         </section>
       </div>
+
+      <section class="caja bloque">
+        <div class="cabecera-bloque">
+          <h3>Pedidos <span class="apagado num">({{ pedidos().length }})</span></h3>
+          <a class="boton" [routerLink]="['/clientes', f.cliente.id, 'pedido']">Registrar pedido</a>
+        </div>
+
+        @if (pedidos().length === 0) {
+          <p class="apagado">Este cliente todav&iacute;a no compr&oacute; nada.</p>
+        } @else {
+          <ul class="pedidos">
+            @for (p of pedidos(); track p.id) {
+              <li [class.anulado]="p.estado === 'anulado'">
+                <div class="cabecera-pedido">
+                  <div>
+                    <span class="principal num">{{ moneda(p.total) }}</span>
+                    <span class="estado-pedido" [class]="p.estado">{{ p.estado }}</span>
+                  </div>
+                  <span class="secundario num">{{ fechaCorta(p.fecha) }}</span>
+                </div>
+                <ul class="items">
+                  @for (i of p.items; track i.producto_id) {
+                    <li>
+                      <span class="cant num">{{ i.cantidad }} &times;</span>
+                      <span>{{ i.nombre }} <span class="secundario">({{ i.unidad }})</span></span>
+                      <span class="num sub">{{ moneda(i.cantidad * i.precio_unitario) }}</span>
+                    </li>
+                  }
+                </ul>
+              </li>
+            }
+          </ul>
+        }
+      </section>
 
       <section class="caja bloque">
         <h3>Bit&aacute;cora <span class="apagado num">({{ f.interacciones.length }})</span></h3>
@@ -217,6 +251,105 @@ import { RegistrarContacto } from './registrar-contacto';
       text-transform: uppercase;
     }
 
+    .cabecera-bloque {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .cabecera-bloque h3 {
+      margin: 0;
+    }
+
+    .pedidos {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .pedidos > li {
+      padding: 10px;
+      border: 1px solid var(--borde);
+      border-radius: var(--radio);
+    }
+
+    /* Un pedido anulado no cuenta como compra: tiene que verse distinto */
+    .pedidos > li.anulado {
+      opacity: 0.6;
+    }
+
+    .pedidos > li.anulado .cabecera-pedido .principal {
+      text-decoration: line-through;
+    }
+
+    .cabecera-pedido {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .cabecera-pedido .principal {
+      font-size: 1rem;
+      margin-right: 6px;
+    }
+
+    .estado-pedido {
+      display: inline-block;
+      padding: 1px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 650;
+      text-transform: uppercase;
+    }
+
+    .estado-pedido.entregado {
+      background: var(--verde-suave);
+      color: #1d6b3c;
+    }
+
+    .estado-pedido.pendiente {
+      background: var(--amarillo-suave);
+      color: #8a6500;
+    }
+
+    .estado-pedido.anulado {
+      background: var(--gris-100);
+      color: var(--gris-700);
+    }
+
+    .items {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      font-size: 0.84rem;
+    }
+
+    .items li {
+      display: flex;
+      gap: 8px;
+    }
+
+    .items .cant {
+      min-width: 44px;
+      color: var(--texto-suave);
+      text-align: right;
+    }
+
+    .items .sub {
+      margin-left: auto;
+      white-space: nowrap;
+    }
+
     .linea {
       display: flex;
       flex-direction: column;
@@ -293,8 +426,10 @@ export class ClienteFicha {
   protected readonly colorContacto = colorContacto;
   protected readonly colorCompra = colorCompra;
   protected readonly fechaCorta = fechaCorta;
+  protected readonly moneda = moneda;
 
   protected readonly ficha = signal<FichaCliente | null>(null);
+  protected readonly pedidos = signal<Pedido[]>([]);
   protected readonly cargando = signal(true);
   protected readonly error = signal('');
 
@@ -323,7 +458,13 @@ export class ClienteFicha {
     this.cargando.set(true);
     this.error.set('');
     try {
-      this.ficha.set(await this.api.get<FichaCliente>(`/clientes/${id}`));
+      // Dos pedidos en paralelo: la ficha y el historial de compras.
+      const [ficha, pedidos] = await Promise.all([
+        this.api.get<FichaCliente>(`/clientes/${id}`),
+        this.api.get<{ pedidos: Pedido[] }>(`/clientes/${id}/pedidos`),
+      ]);
+      this.ficha.set(ficha);
+      this.pedidos.set(pedidos.pedidos);
     } catch (e) {
       this.error.set(mensajeDeError(e, 'No se pudo cargar el cliente'));
     } finally {

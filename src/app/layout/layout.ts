@@ -30,6 +30,7 @@ import { Sesion } from '../nucleo/sesion';
       <a routerLink="/riesgo" routerLinkActive="activo">En riesgo</a>
       <a routerLink="/pipeline" routerLinkActive="activo">Pipeline</a>
       <a routerLink="/alertas" routerLinkActive="activo">Alertas</a>
+      <a routerLink="/productos" routerLinkActive="activo">Catalogo</a>
       @if (sesion.esAdmin()) {
         <a routerLink="/panel" routerLinkActive="activo">Panel</a>
       }

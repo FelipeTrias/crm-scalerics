@@ -59,3 +59,8 @@ export function fechaCorta(iso: string | null): string {
   if (!a || !m || !d) return iso;
   return `${d} ${MESES[m - 1]} ${a}`;
 }
+
+/** Pesos uruguayos, sin decimales: los montos de insumos son enteros. */
+export function moneda(valor: number): string {
+  return '$ ' + Math.round(valor).toLocaleString('es-UY');
+}

@@ -28,6 +28,10 @@ export const routes: Routes = [
           import('./paginas/cliente/formulario-cliente').then((m) => m.FormularioCliente),
       },
       {
+        path: 'clientes/:id/pedido',
+        loadComponent: () => import('./paginas/pedido/nuevo-pedido').then((m) => m.NuevoPedido),
+      },
+      {
         path: 'clientes/:id',
         loadComponent: () => import('./paginas/cliente/cliente').then((m) => m.ClienteFicha),
       },
@@ -38,6 +42,10 @@ export const routes: Routes = [
       {
         path: 'pipeline',
         loadComponent: () => import('./paginas/pipeline/pipeline').then((m) => m.Pipeline),
+      },
+      {
+        path: 'productos',
+        loadComponent: () => import('./paginas/productos/productos').then((m) => m.Productos),
       },
       {
         path: 'alertas',

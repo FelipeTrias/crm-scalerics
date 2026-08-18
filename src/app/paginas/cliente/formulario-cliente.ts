@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Api, mensajeDeError } from '../../nucleo/api';
@@ -164,17 +164,21 @@ export class FormularioCliente {
   };
 
   constructor() {
-    if (typeof window !== 'undefined') void this.iniciar();
+    // Igual que en nuevo-pedido: el input de la ruta no existe todavia en el
+    // constructor. Sin esto, editar un cliente cargaba el formulario vacio.
+    effect(() => {
+      const id = this.id();
+      if (typeof window !== 'undefined') void this.iniciar(id);
+    });
   }
 
-  private async iniciar(): Promise<void> {
+  private async iniciar(id: string | undefined): Promise<void> {
     this.cargando.set(true);
     try {
       if (this.sesion.esAdmin()) {
         const r = await this.api.get<{ vendedores: Vendedor[] }>('/vendedores');
         this.vendedores.set(r.vendedores.filter((v) => v.activo === 1));
       }
-      const id = this.id();
       if (id) {
         const f = await this.api.get<FichaCliente>(`/clientes/${id}`);
         this.datos = {

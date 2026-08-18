@@ -56,3 +56,18 @@ export const ETAPAS_OPORTUNIDAD = [
   'perdido',
 ] as const;
 export const MONEDAS = ['UYU', 'USD'] as const;
+
+/**
+ * Total de un pedido. No se guarda: se calcula sumando los renglones.
+ *
+ * Mismo criterio que "dias sin contacto" — no guardar lo que se puede derivar,
+ * porque tarde o temprano se desincroniza. Los precios ya quedaron congelados
+ * en cada renglon al momento de la venta, asi que la suma es estable.
+ *
+ * Espera que la consulta tenga la tabla `pedidos` con alias `p`.
+ */
+export const SQL_TOTAL_PEDIDO =
+  '(SELECT COALESCE(SUM(i.cantidad * i.precio_unitario), 0) ' +
+  'FROM pedido_items i WHERE i.pedido_id = p.id)';
+
+export const ESTADOS_PEDIDO = ['pendiente', 'entregado', 'anulado'] as const;

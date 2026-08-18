@@ -78,3 +78,37 @@ export interface Vendedor {
   activo: number;
   clientes: number;
 }
+
+export interface Producto {
+  id: number;
+  codigo: string;
+  nombre: string;
+  categoria: string;
+  unidad: string;
+  precio_lista: number;
+  activo: number;
+}
+
+export interface PedidoItem {
+  producto_id: number;
+  codigo: string;
+  nombre: string;
+  unidad: string;
+  cantidad: number;
+  /** Precio al momento de la venta, no el actual del catalogo. */
+  precio_unitario: number;
+}
+
+export type EstadoPedido = 'pendiente' | 'entregado' | 'anulado';
+
+export interface Pedido {
+  id: number;
+  fecha: string;
+  estado: EstadoPedido;
+  notas: string | null;
+  vendedor_id: number;
+  vendedor_nombre: string;
+  /** Se calcula en el servidor sumando los renglones; no esta guardado. */
+  total: number;
+  items: PedidoItem[];
+}

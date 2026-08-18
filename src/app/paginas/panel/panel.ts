@@ -19,7 +19,7 @@ interface PorVendedor {
   interacciones_semana: number;
   presupuestos_en_curso: number;
   presupuestos_enviados: number;
-  monto_ganado: number;
+  monto_vendido: number;
 }
 
 interface PorEtapa {
@@ -108,7 +108,7 @@ interface RiesgoVendedor {
                   <td class="num" [class.cero]="v.interacciones_semana === 0">{{ v.interacciones_semana }}</td>
                   <td class="num">{{ v.presupuestos_en_curso }}</td>
                   <td class="num">{{ v.presupuestos_enviados }}</td>
-                  <td class="num plata">{{ moneda(v.monto_ganado) }}</td>
+                  <td class="num plata">{{ moneda(v.monto_vendido) }}</td>
                 </tr>
               }
             </tbody>

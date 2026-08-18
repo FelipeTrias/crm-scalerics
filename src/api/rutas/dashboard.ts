@@ -35,8 +35,12 @@ export async function verDashboard(ctx: Contexto, sesion: Sesion): Promise<Respo
         // estar de "cuantos presupuestos mando" sin guardar el historial.
         '  (SELECT COUNT(*) FROM oportunidades o WHERE o.vendedor_id = u.id ' +
         "     AND o.etapa NOT IN ('nuevo','contactado')) AS presupuestos_enviados, " +
-        '  (SELECT COALESCE(SUM(o.monto_estimado), 0) FROM oportunidades o WHERE o.vendedor_id = u.id ' +
-        "     AND o.etapa = 'ganado') AS monto_ganado " +
+        // Lo vendido sale de los pedidos reales, no del monto estimado de las
+        // oportunidades: una cosa es lo que se esperaba cerrar y otra lo que
+        // el cliente termino comprando.
+        '  (SELECT COALESCE(SUM(i.cantidad * i.precio_unitario), 0) ' +
+        '     FROM pedidos pd JOIN pedido_items i ON i.pedido_id = pd.id ' +
+        "    WHERE pd.vendedor_id = u.id AND pd.estado <> 'anulado') AS monto_vendido " +
         "  FROM usuarios u WHERE u.rol = 'vendedor' AND u.activo = 1 " +
         ' ORDER BY u.nombre COLLATE NOCASE',
     ),
