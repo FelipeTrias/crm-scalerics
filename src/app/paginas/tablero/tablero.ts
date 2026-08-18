@@ -18,6 +18,8 @@ interface PedidoTablero {
   notas: string | null;
   total: number;
   renglones: number;
+  /** Dias desde que se emitio. Lo calcula el servidor. */
+  dias: number;
 }
 
 interface ResumenEstado {
@@ -78,11 +80,14 @@ interface ResumenEstado {
                   </a>
                   <div class="pie">
                     <span class="num plata">{{ moneda(p.total) }}</span>
-                    <span class="secundario num">{{ p.renglones }} prod. &middot; {{ fechaCorta(p.fecha) }}</span>
+                    <span class="secundario num">{{ p.renglones }} prod.</span>
                   </div>
-                  @if (sesion.esAdmin()) {
-                    <div class="secundario">{{ p.vendedor_nombre }}</div>
-                  }
+                  <div class="antiguedad">
+                    <span class="edad" [class]="temperatura(p)">{{ antiguedad(p) }}</span>
+                    @if (sesion.esAdmin()) {
+                      <span class="secundario">{{ p.vendedor_nombre }}</span>
+                    }
+                  </div>
                   @if (p.notas) {
                     <div class="secundario motivo">{{ p.notas }}</div>
                   }
@@ -235,6 +240,38 @@ interface ResumenEstado {
       font-style: italic;
     }
 
+    .antiguedad {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 0.78rem;
+    }
+
+    /* Un presupuesto viejo no es lo mismo que uno de ayer, y hoy eso no se
+       veia: habia que restar fechas de cabeza. */
+    .edad {
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .edad.fresco {
+      color: var(--verde);
+    }
+
+    .edad.tibio {
+      color: #8a6500;
+    }
+
+    .edad.frio {
+      color: var(--rojo);
+    }
+
+    .edad.neutro {
+      color: var(--texto-suave);
+      font-weight: 500;
+    }
+
     .pedido select {
       min-height: 38px;
       font-size: 0.82rem;
@@ -294,6 +331,23 @@ export class Tablero {
 
   constructor() {
     afterNextRender(() => void this.cargar());
+  }
+
+  protected antiguedad(p: PedidoTablero): string {
+    if (p.dias <= 0) return 'hoy';
+    if (p.dias === 1) return 'ayer';
+    return 'hace ' + p.dias + ' dias';
+  }
+
+  /**
+   * Solo se colorea lo que sigue en juego. Que un pedido entregado tenga 40
+   * dias no dice nada; que un presupuesto los tenga, si.
+   */
+  protected temperatura(p: PedidoTablero): string {
+    if (p.estado !== 'presupuesto' && p.estado !== 'confirmado') return 'neutro';
+    if (p.dias > 45) return 'frio';
+    if (p.dias > 15) return 'tibio';
+    return 'fresco';
   }
 
   protected resumenDe(estado: string): ResumenEstado {

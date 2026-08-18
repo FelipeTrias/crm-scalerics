@@ -72,7 +72,12 @@ export async function verPipeline(ctx: Contexto, sesion: Sesion): Promise<Respon
       'SELECT p.id, p.cliente_id, c.razon_social, c.nombre_fantasia, p.vendedor_id, ' +
         '       u.nombre AS vendedor_nombre, p.fecha, p.estado, p.notas, ' +
         '       ' + SQL_TOTAL_PEDIDO + ' AS total, ' +
-        '       (SELECT COUNT(*) FROM pedido_items i WHERE i.pedido_id = p.id) AS renglones ' +
+        '       (SELECT COUNT(*) FROM pedido_items i WHERE i.pedido_id = p.id) AS renglones, ' +
+        // La antiguedad se calcula aca, igual que los dias sin contacto. Un
+        // presupuesto de hace 3 dias esta caliente; uno de hace 60 esta muerto
+        // y nadie lo dijo. Es lo que responde "cual esta por cerrar" sin
+        // pedirle al vendedor que mantenga una etiqueta a mano.
+        "       CAST(julianday('now') - julianday(p.fecha) AS INTEGER) AS dias " +
         '  FROM pedidos p ' +
         '  JOIN clientes c ON c.id = p.cliente_id ' +
         '  JOIN usuarios u ON u.id = p.vendedor_id ' +
