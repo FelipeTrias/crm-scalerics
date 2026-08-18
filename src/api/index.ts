@@ -16,10 +16,11 @@ import {
   editarCliente,
   eliminarCliente,
   listarClientes,
+  marcarAtendido,
   reasignarCartera,
   verCliente,
 } from './rutas/clientes';
-import { editarAlerta, generarAlertasAhora, listarAlertas } from './rutas/alertas';
+import { generarAlertasAhora, listarAlertas } from './rutas/alertas';
 import { editarUsuario, listarVendedores } from './rutas/usuarios';
 import { crearPedido, editarPedido, listarPedidos, listarProductos, verPipeline } from './rutas/pedidos';
 import { crearContacto, editarContacto } from './rutas/contactos';
@@ -55,6 +56,8 @@ const RUTAS: Ruta[] = [
   ruta('PATCH', '/api/clientes/:id', editarCliente),
   ruta('DELETE', '/api/clientes/:id', eliminarCliente),
 
+  ruta('POST', '/api/clientes/:id/atendido', marcarAtendido),
+
   ruta('GET', '/api/clientes/:id/interacciones', listarInteracciones),
   ruta('POST', '/api/clientes/:id/interacciones', crearInteraccion),
 
@@ -62,7 +65,6 @@ const RUTAS: Ruta[] = [
 
   ruta('GET', '/api/alertas', listarAlertas),
   ruta('POST', '/api/alertas/generar', generarAlertasAhora),
-  ruta('PATCH', '/api/alertas/:id', editarAlerta),
 
   ruta('GET', '/api/vendedores', listarVendedores),
   ruta('PATCH', '/api/usuarios/:id', editarUsuario),

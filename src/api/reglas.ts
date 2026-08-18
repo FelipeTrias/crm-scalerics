@@ -72,3 +72,28 @@ export const ESTADOS_PEDIDO = ['presupuesto', 'confirmado', 'entregado', 'perdid
 
 /** Los unicos estados que significan que el cliente compro. */
 export const ESTADOS_VENDIDOS = "('confirmado','entregado')";
+
+/**
+ * Cuantos dias se silencia un cliente cuando el vendedor dice "ya lo atendi".
+ *
+ * No desaparece de la lista para siempre: si en una semana el cliente sigue sin
+ * comprar, vuelve a aparecer. Es un "ya se, dejame en paz un rato", no un
+ * "ignoralo".
+ */
+export const DIAS_ATENDIDO = 7;
+
+/**
+ * 1 si alguien marco este cliente como atendido hace menos de DIAS_ATENDIDO.
+ * Espera la tabla `clientes` con alias `c`.
+ *
+ * La tabla `alertas` guarda las dos caras de lo mismo: las filas 'pendiente'
+ * son lo que detecto el cron y nadie miro todavia, y las 'resuelta' son las
+ * atenciones. Por eso el silencio y el aviso viven en el mismo lugar.
+ */
+export const SQL_ATENDIDO =
+  "(SELECT COUNT(*) FROM alertas a WHERE a.cliente_id = c.id AND a.estado = 'resuelta' " +
+  "AND a.generada_en > datetime('now','-" + DIAS_ATENDIDO + " days')) > 0";
+
+/** Cuantos avisos sin mirar dejo el cron para este cliente. */
+export const SQL_AVISOS_NUEVOS =
+  "(SELECT COUNT(*) FROM alertas a WHERE a.cliente_id = c.id AND a.estado = 'pendiente')";

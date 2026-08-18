@@ -1,5 +1,6 @@
-import { Component, inject } from '@angular/core';
+import { Component, afterNextRender, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Api } from '../nucleo/api';
 import { Sesion } from '../nucleo/sesion';
 
 /**
@@ -42,6 +43,9 @@ import { Sesion } from '../nucleo/sesion';
             <path d="M12 17h.01" />
           </svg>
           En riesgo
+          @if (avisos() > 0) {
+            <span class="contador">{{ avisos() }}</span>
+          }
         </a>
         <a routerLink="/pedidos" routerLinkActive="activo">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
@@ -51,13 +55,6 @@ import { Sesion } from '../nucleo/sesion';
             <path d="M9 15h4" />
           </svg>
           Pedidos
-        </a>
-        <a routerLink="/alertas" routerLinkActive="activo">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
-            <path d="M18 8a6 6 0 10-12 0c0 7-3 8-3 8h18s-3-1-3-8" />
-            <path d="M10 21h4" />
-          </svg>
-          Alertas
         </a>
         <a routerLink="/productos" routerLinkActive="activo">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
@@ -113,6 +110,9 @@ import { Sesion } from '../nucleo/sesion';
           <path d="M12 17h.01" />
         </svg>
         En riesgo
+        @if (avisos() > 0) {
+          <span class="punto" aria-label="hay avisos nuevos"></span>
+        }
       </a>
       <a routerLink="/pedidos" routerLinkActive="activo">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
@@ -121,13 +121,6 @@ import { Sesion } from '../nucleo/sesion';
           <path d="M9 11h6" />
         </svg>
         Pedidos
-      </a>
-      <a routerLink="/alertas" routerLinkActive="activo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-          <path d="M18 8a6 6 0 10-12 0c0 7-3 8-3 8h18s-3-1-3-8" />
-          <path d="M10 21h4" />
-        </svg>
-        Alertas
       </a>
       @if (sesion.esAdmin()) {
         <a routerLink="/panel" routerLinkActive="activo">
@@ -235,6 +228,33 @@ import { Sesion } from '../nucleo/sesion';
       width: 19px;
       height: 19px;
       flex: none;
+    }
+
+    .contador {
+      margin-left: auto;
+      min-width: 22px;
+      padding: 1px 6px;
+      border-radius: 999px;
+      background: var(--rojo);
+      color: #fff;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .punto {
+      position: absolute;
+      top: 8px;
+      margin-left: 26px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--rojo);
+    }
+
+    .nav-celular a {
+      position: relative;
     }
 
     /* ─────────────────────── Columna principal ─────────────────────── */
@@ -385,6 +405,27 @@ import { Sesion } from '../nucleo/sesion';
 export class Layout {
   protected readonly sesion = inject(Sesion);
   private readonly router = inject(Router);
+  private readonly api = inject(Api);
+
+  /**
+   * Avisos que dejo el cron sin mirar. Es lo unico que "llega" al vendedor sin
+   * que vaya a buscarlo, hasta que se pueda mandar el WhatsApp automatico.
+   */
+  protected readonly avisos = signal(0);
+
+  constructor() {
+    afterNextRender(() => void this.contarAvisos());
+  }
+
+  private async contarAvisos(): Promise<void> {
+    try {
+      const r = await this.api.get<{ alertas: unknown[] }>('/alertas');
+      this.avisos.set(r.alertas.length);
+    } catch {
+      // Un contador que falla no tiene que romper la navegacion.
+      this.avisos.set(0);
+    }
+  }
 
   async salir(): Promise<void> {
     await this.sesion.cerrar();

@@ -42,7 +42,7 @@ probar "PATCH /api/usuarios/2"         401 -X PATCH  "$B/api/usuarios/2"        
 probar "PATCH /api/pedidos/1"       401 -X PATCH  "$B/api/pedidos/1"          -H "$J" -d '{"estado":"entregado"}'
 probar "POST /api/clientes/1/pedidos" 401 -X POST   "$B/api/clientes/1/pedidos" -H "$J" -d '{"items":[]}'
 probar "GET /api/productos"          401 "$B/api/productos"
-probar "PATCH /api/alertas/1"          401 -X PATCH  "$B/api/alertas/1"           -H "$J" -d '{"estado":"vista"}'
+probar "POST /api/clientes/1/atendido"  401 -X POST   "$B/api/clientes/1/atendido" -H "$J" -d '{}'
 probar "POST /api/clientes/1/contactos" 401 -X POST  "$B/api/clientes/1/contactos" -H "$J" -d '{"nombre":"X"}'
 probar "PATCH /api/contactos/1"        401 -X PATCH  "$B/api/contactos/1"         -H "$J" -d '{"cargo":"X"}'
 
@@ -74,7 +74,7 @@ probar "reasignar cartera -> 403"          403 -b "$M" -X POST "$B/api/clientes/
 probar "dar de baja usuario -> 403"        403 -b "$M" -X PATCH "$B/api/usuarios/3" -H "$J" -d '{"activo":0}'
 probar "listar vendedores -> 403"          403 -b "$M" "$B/api/vendedores"
 probar "dashboard -> 403"                  403 -b "$M" "$B/api/dashboard"
-probar "PATCH alerta ajena -> 403 o 404"   404 -b "$M" -X PATCH "$B/api/alertas/1" -H "$J" -d '{"estado":"vista"}'
+probar "marcar atendido cliente ajeno -> 403" 403 -b "$M" -X POST "$B/api/clientes/1/atendido" -H "$J" -d '{}'
 
 echo "── 5. El admin sí puede ──"
 probar "admin ve cliente ajeno"     200 -b "$G" "$B/api/clientes/1"

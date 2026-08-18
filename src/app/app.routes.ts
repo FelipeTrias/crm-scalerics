@@ -48,10 +48,6 @@ export const routes: Routes = [
         loadComponent: () => import('./paginas/productos/productos').then((m) => m.Productos),
       },
       {
-        path: 'alertas',
-        loadComponent: () => import('./paginas/alertas/alertas').then((m) => m.Alertas),
-      },
-      {
         path: 'panel',
         loadComponent: () => import('./paginas/panel/panel').then((m) => m.Panel),
       },

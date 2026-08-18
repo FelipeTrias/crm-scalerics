@@ -4,12 +4,15 @@
  * Todas las consultas de este archivo arrancan con el filtro de alcance de
  * permisos.ts. Es deliberado que sea lo primero que se agrega al WHERE.
  */
+import { clienteAccesible, esRespuesta } from '../acceso';
 import { enteroPositivo, error, esUnoDe, json, leerBody, textoNoVacio } from '../http';
 import { escaparLike, esAdmin, filtroPorVendedor } from '../permisos';
 import {
   DIAS_SIN_COMPRA_RIESGO,
   DIAS_SIN_CONTACTO_RIESGO,
   ESTADOS_CLIENTE,
+  SQL_ATENDIDO,
+  SQL_AVISOS_NUEVOS,
   SQL_DIAS_SIN_COMPRA,
   SQL_DIAS_SIN_CONTACTO,
 } from '../reglas';
@@ -32,6 +35,8 @@ interface FilaCliente {
   ultima_interaccion: string | null;
   contacto_principal: string | null;
   whatsapp: string | null;
+  atendido: number;
+  avisos_nuevos: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -90,7 +95,11 @@ export async function listarClientes(ctx: Contexto, sesion: Sesion): Promise<Res
     '         ORDER BY ct.es_principal DESC, ct.id LIMIT 1) AS whatsapp, ' +
     '       ' + SQL_DIAS_SIN_CONTACTO + ' AS dias_sin_contacto, ' +
     '       ' + SQL_DIAS_SIN_COMPRA + ' AS dias_sin_compra, ' +
-    '       max(' + SQL_DIAS_SIN_CONTACTO + ', COALESCE(' + SQL_DIAS_SIN_COMPRA + ', 0)) AS prioridad ' +
+    '       max(' + SQL_DIAS_SIN_CONTACTO + ', COALESCE(' + SQL_DIAS_SIN_COMPRA + ', 0)) AS prioridad, ' +
+    // "Ya lo atendi" silencia la fila unos dias, y los avisos que dejo el cron
+    // sin mirar son los que se marcan como nuevos en la pantalla de riesgo.
+    '       ' + SQL_ATENDIDO + ' AS atendido, ' +
+    '       ' + SQL_AVISOS_NUEVOS + ' AS avisos_nuevos ' +
     '  FROM clientes c ' +
     '  JOIN usuarios u ON u.id = c.vendedor_id ' +
     '  LEFT JOIN interacciones i ON i.cliente_id = c.id ' +
@@ -304,6 +313,55 @@ export async function eliminarCliente(ctx: Contexto, sesion: Sesion): Promise<Re
     .run();
 
   if (resultado.meta.changes === 0) return error('Cliente no encontrado', 404);
+  return json({ ok: true });
+}
+
+// ---------------------------------------------------------------------------
+//  POST /api/clientes/:id/atendido
+// ---------------------------------------------------------------------------
+
+/**
+ * "Ya lo atendi".
+ *
+ * Silencia al cliente en la pantalla de riesgo por unos dias y da por vistos
+ * los avisos que dejo el cron. No lo saca de la lista para siempre: si en una
+ * semana sigue sin comprar, vuelve a aparecer.
+ *
+ * Antes esto era una pantalla aparte de alertas, con sus propios botones. Eran
+ * dos pantallas mostrando los mismos clientes, y para alguien que no es de la
+ * computadora eso es una pantalla de mas. Ahora es un boton en la fila.
+ */
+export async function marcarAtendido(ctx: Contexto, sesion: Sesion): Promise<Response> {
+  const cliente = await clienteAccesible(ctx.env, enteroPositivo(ctx.params['id']), sesion, 'escritura');
+  if (esRespuesta(cliente)) return cliente;
+
+  // El motivo se calcula: se guarda por cual de las dos causas estaba en riesgo.
+  const estado = await ctx.env.DB.prepare(
+    'SELECT ' + SQL_DIAS_SIN_CONTACTO + ' AS sin_contacto, ' +
+      '       ' + SQL_DIAS_SIN_COMPRA + ' AS sin_compra ' +
+      '  FROM clientes c LEFT JOIN interacciones i ON i.cliente_id = c.id ' +
+      ' WHERE c.id = ? GROUP BY c.id',
+  )
+    .bind(cliente.id)
+    .first<{ sin_contacto: number; sin_compra: number | null }>();
+
+  const sinCompra = estado?.sin_compra ?? 0;
+  const sinContacto = estado?.sin_contacto ?? 0;
+  const tipo = sinCompra > sinContacto ? 'sin_compra' : 'sin_contacto';
+  const dias = Math.max(sinCompra, sinContacto);
+
+  await ctx.env.DB.batch([
+    // Los avisos que el cron dejo pendientes quedan atendidos.
+    ctx.env.DB.prepare("UPDATE alertas SET estado = 'resuelta' WHERE cliente_id = ? AND estado = 'pendiente'").bind(
+      cliente.id,
+    ),
+    // Y se deja constancia de la atencion, que es lo que silencia la fila.
+    ctx.env.DB.prepare(
+      'INSERT INTO alertas (cliente_id, vendedor_id, tipo, dias_sin_contacto, mensaje, estado) ' +
+        "VALUES (?, ?, ?, ?, ?, 'resuelta')",
+    ).bind(cliente.id, cliente.vendedor_id, tipo, dias, 'Atendido por ' + sesion.nombre),
+  ]);
+
   return json({ ok: true });
 }
 

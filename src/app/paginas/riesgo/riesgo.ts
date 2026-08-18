@@ -16,6 +16,12 @@ import { Sesion } from '../../nucleo/sesion';
  * visitado a alguien la semana pasada y que no compre hace ocho meses. El
  * servidor las ordena por la peor de las dos, para que ese caso no quede al
  * fondo de la lista.
+ *
+ * Antes habia dos pantallas: esta y una de alertas, con los mismos clientes.
+ * Para alguien que no es de la computadora eso es una pantalla de mas, asi que
+ * se unificaron: la lista se calcula en vivo, y lo que antes era "marcar la
+ * alerta" ahora es el boton "Ya lo atendi" de cada fila, que la silencia unos
+ * dias. El cron sigue corriendo: lo que deja se ve como el cartel "nuevo".
  */
 @Component({
   selector: 'app-riesgo',
@@ -23,12 +29,19 @@ import { Sesion } from '../../nucleo/sesion';
   template: `
     <div class="titulo">
       <h2>Clientes en riesgo</h2>
-      <span class="apagado num">{{ clientes().length }} clientes</span>
+      <span class="apagado num">{{ leyenda() }}</span>
+      @if (atendidos().length > 0) {
+        <button type="button" class="boton secundario chico" (click)="verAtendidos.set(!verAtendidos())">
+          {{ verAtendidos() ? 'Ocultar' : 'Ver' }} {{ atendidos().length }}
+          {{ atendidos().length === 1 ? 'atendido' : 'atendidos' }}
+        </button>
+      }
     </div>
 
     <p class="explicacion">
       Un cliente entra ac&aacute; por <strong>m&aacute;s de 60 d&iacute;as sin contacto</strong> o por
       <strong>m&aacute;s de 180 d&iacute;as sin comprar</strong>. Las dos cosas no siempre pasan juntas.
+      Con <strong>Ya lo atend&iacute;</strong> la fila se guarda una semana; si el cliente sigue igual, vuelve.
     </p>
 
     @if (error()) {
@@ -37,9 +50,22 @@ import { Sesion } from '../../nucleo/sesion';
 
     @if (cargando()) {
       <p class="vacio">Buscando clientes en riesgo...</p>
-    } @else if (clientes().length === 0) {
-      <p class="vacio">No hay clientes en riesgo. Toda la cartera est&aacute; al d&iacute;a.</p>
-    } @else {
+    } @else if (visibles().length === 0) {
+      <p class="vacio">
+        @if (atendidos().length > 0) {
+          No queda nada sin atender.
+          @if (atendidos().length === 1) {
+            El que falta ya lo marcaste.
+          } @else {
+            Los {{ atendidos().length }} que faltan ya los marcaste.
+          }
+        } @else {
+          No hay clientes en riesgo. Toda la cartera est&aacute; al d&iacute;a.
+        }
+      </p>
+    }
+
+    @if (visibles().length > 0) {
       <!-- Escritorio -->
       <div class="caja solo-escritorio">
         <div class="desplazable">
@@ -57,12 +83,15 @@ import { Sesion } from '../../nucleo/sesion';
               </tr>
             </thead>
             <tbody>
-              @for (c of clientes(); track c.id) {
-                <tr [class]="gravedad(c)">
+              @for (c of visibles(); track c.id) {
+                <tr [class]="gravedad(c)" [class.atendido]="c.atendido">
                   <td>
                     <a class="enlace" [routerLink]="['/clientes', c.id]">
                       <span class="principal">{{ c.nombre_fantasia || c.razon_social }}</span>
                     </a>
+                    @if (c.avisos_nuevos && !c.atendido) {
+                      <span class="nuevo">nuevo</span>
+                    }
                     <div class="secundario">{{ motivo(c) }}</div>
                   </td>
                   @if (sesion.esAdmin()) {
@@ -83,11 +112,21 @@ import { Sesion } from '../../nucleo/sesion';
                     }
                   </td>
                   <td class="apagado">{{ fechaCorta(c.ultima_interaccion) }}</td>
-                  <td>
+                  <td class="acciones">
                     @if (enlaceDe(c); as url) {
                       <a class="boton whatsapp compacto" [href]="url" target="_blank" rel="noopener">WhatsApp</a>
+                    }
+                    @if (!c.atendido) {
+                      <button
+                        type="button"
+                        class="boton secundario compacto"
+                        (click)="atender(c)"
+                        [disabled]="marcando() === c.id"
+                      >
+                        Ya lo atend&iacute;
+                      </button>
                     } @else {
-                      <span class="apagado sin-tel">sin tel&eacute;fono</span>
+                      <span class="apagado marca-atendido">atendido</span>
                     }
                   </td>
                 </tr>
@@ -99,12 +138,17 @@ import { Sesion } from '../../nucleo/sesion';
 
       <!-- Celular -->
       <div class="tarjetas solo-celular">
-        @for (c of clientes(); track c.id) {
-          <article class="tarjeta" [class]="gravedad(c)">
+        @for (c of visibles(); track c.id) {
+          <article class="tarjeta" [class]="gravedad(c)" [class.atendido]="c.atendido">
             <a class="enlace" [routerLink]="['/clientes', c.id]">
               <div class="arriba">
                 <div>
-                  <div class="principal">{{ c.nombre_fantasia || c.razon_social }}</div>
+                  <div class="principal">
+                    {{ c.nombre_fantasia || c.razon_social }}
+                    @if (c.avisos_nuevos && !c.atendido) {
+                      <span class="nuevo">nuevo</span>
+                    }
+                  </div>
                   <div class="secundario">
                     {{ c.contacto_principal || 'sin contacto cargado' }}@if (sesion.esAdmin()) { · {{ c.vendedor_nombre }} }
                   </div>
@@ -126,9 +170,16 @@ import { Sesion } from '../../nucleo/sesion';
                 </span>
               }
             </div>
-            @if (enlaceDe(c); as url) {
-              <a class="boton whatsapp" [href]="url" target="_blank" rel="noopener">Enviar WhatsApp</a>
-            }
+            <div class="botones">
+              @if (enlaceDe(c); as url) {
+                <a class="boton whatsapp" [href]="url" target="_blank" rel="noopener">WhatsApp</a>
+              }
+              @if (!c.atendido) {
+                <button type="button" class="boton secundario" (click)="atender(c)" [disabled]="marcando() === c.id">
+                  Ya lo atend&iacute;
+                </button>
+              }
+            </div>
           </article>
         }
       </div>
@@ -141,6 +192,13 @@ import { Sesion } from '../../nucleo/sesion';
       flex-wrap: wrap;
       gap: 10px;
       margin-bottom: 8px;
+    }
+
+    .boton.chico {
+      min-height: 34px;
+      padding: 0 12px;
+      font-size: 0.8rem;
+      margin-left: auto;
     }
 
     .explicacion {
@@ -183,6 +241,27 @@ import { Sesion } from '../../nucleo/sesion';
       border-left: 4px solid var(--amarillo);
     }
 
+    /* Ya atendido: sigue en riesgo, pero alguien se hizo cargo */
+    tbody tr.atendido,
+    .tarjeta.atendido {
+      opacity: 0.55;
+    }
+
+    /* Lo que dejo el cron y nadie miro todavia */
+    .nuevo {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: var(--rojo);
+      color: #fff;
+      font-size: 0.64rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      vertical-align: 1px;
+    }
+
     .motivo {
       flex: none;
       padding: 2px 7px;
@@ -196,19 +275,33 @@ import { Sesion } from '../../nucleo/sesion';
       text-align: center;
     }
 
+    .acciones {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
     .boton.compacto {
-      min-height: 36px;
-      padding: 0 12px;
-      font-size: 0.8rem;
-      text-decoration: none;
-    }
-
-    .boton.whatsapp {
-      text-decoration: none;
-    }
-
-    .sin-tel {
+      min-height: 34px;
+      padding: 0 10px;
       font-size: 0.78rem;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .marca-atendido {
+      font-size: 0.75rem;
+      font-style: italic;
+    }
+
+    .botones {
+      display: flex;
+      gap: 8px;
+    }
+
+    .botones .boton {
+      flex: 1;
+      text-decoration: none;
     }
 
     .solo-celular {
@@ -235,8 +328,25 @@ export class Riesgo {
   protected readonly fechaCorta = fechaCorta;
 
   protected readonly clientes = signal<Cliente[]>([]);
+  protected readonly verAtendidos = signal(false);
   protected readonly cargando = signal(true);
+  protected readonly marcando = signal<number | null>(null);
   protected readonly error = signal('');
+
+  protected readonly atendidos = computed(() => this.clientes().filter((c) => c.atendido));
+
+  /** Los atendidos se esconden salvo que se pidan: son ruido para el que trabaja. */
+  protected readonly visibles = computed(() =>
+    this.verAtendidos() ? this.clientes() : this.clientes().filter((c) => !c.atendido),
+  );
+
+  protected readonly leyenda = computed(() => {
+    const sinAtender = this.clientes().length - this.atendidos().length;
+    const nuevos = this.clientes().filter((c) => c.avisos_nuevos && !c.atendido).length;
+    const base = `${sinAtender} sin atender`;
+    if (nuevos === 0) return base;
+    return `${base} · ${nuevos} ${nuevos === 1 ? 'nuevo' : 'nuevos'}`;
+  });
 
   constructor() {
     afterNextRender(() => void this.cargar());
@@ -266,6 +376,19 @@ export class Riesgo {
         `y queria saber como andan de stock para dejarles una cotizacion al dia. ` +
         `Te paso a visitar esta semana?`,
     );
+  }
+
+  protected async atender(c: Cliente): Promise<void> {
+    this.marcando.set(c.id);
+    this.error.set('');
+    try {
+      await this.api.post(`/clientes/${c.id}/atendido`, {});
+      await this.cargar();
+    } catch (e) {
+      this.error.set(mensajeDeError(e, 'No se pudo marcar como atendido'));
+    } finally {
+      this.marcando.set(null);
+    }
   }
 
   private async cargar(): Promise<void> {

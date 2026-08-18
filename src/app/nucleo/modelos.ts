@@ -28,6 +28,10 @@ export interface Cliente {
   /** Solo viene en el listado, para el boton de WhatsApp. */
   contacto_principal?: string | null;
   whatsapp?: string | null;
+  /** 1 si alguien lo marco como atendido en la ultima semana. */
+  atendido?: number;
+  /** Avisos que dejo el cron y nadie miro todavia. */
+  avisos_nuevos?: number;
 }
 
 export interface Contacto {
