@@ -37,7 +37,7 @@ No es "falta un Excel mejor". Es que **la cartera de clientes hoy es propiedad d
 - Proyecto Angular + Cloudflare Workers creado con `npm create cloudflare@latest`
 - Desplegado y funcionando en **https://crm-scalerics.felipetrias.workers.dev**
 - Repo en GitHub: `FelipeTrias/crm-scalerics`, rama `main`
-- GitHub Actions desplegando automáticamente en cada push a `main`
+- Deploy **manual**: `npm run deploy` (corre `ng build` y despues `wrangler deploy`)
 
 ⬜ Pendiente:
 
@@ -46,7 +46,11 @@ No es "falta un Excel mejor". Es que **la cartera de clientes hoy es propiedad d
 3. API en el Worker
 4. Pantallas en Angular
 5. Motor de alertas (cron trigger)
-6. README y cierre
+6. Reasignacion de cartera entre vendedores
+7. README y cierre
+
+> ⚠️ **No hay CI.** El repo no tiene `.github/workflows/` y nunca lo tuvo.
+> Cada deploy se dispara a mano. Si algun dia se agrega, actualizar esta seccion.
 
 ---
 
@@ -108,6 +112,10 @@ const angularApp = new AngularAppEngine({
 **Si se agrega un dominio nuevo, hay que agregarlo también acá.** Es la causa del error
 `Header "host" with value "..." is not allowed.`
 
+Ojo: hay un **segundo** lugar con la misma clave. `angular.json` tiene
+`architect.build.options.security.allowedHosts`, que es el que aplica al dev-server
+del CLI. Si el error aparece en `ng serve` y tocar `server.ts` no lo arregla, es ese otro.
+
 ### Acceso al binding de D1 desde el Worker
 
 `createRequestHandler` de Angular solo recibe el `Request`, no el `env`. Para llegar al binding hay que exportar un `fetch` propio que reciba `(request, env, ctx)`, atender `/api/*` ahí, y delegar el resto a Angular. Patrón:
@@ -126,6 +134,19 @@ export default {
   },
 };
 ```
+
+### Secretos: el JWT necesita una clave
+
+Firmar el JWT requiere un secreto. **No va hardcodeado en el codigo ni commiteado.**
+
+- Local: archivo `.dev.vars` en la raiz (ya esta cubierto por `.gitignore`)
+  ```
+  JWT_SECRET=algo-largo-y-aleatorio-solo-para-desarrollo
+  ```
+- Produccion: `npx wrangler secret put JWT_SECRET`
+
+Se lee como `env.JWT_SECRET`. Si falta, el login tiene que fallar con un error claro
+— nunca caer a un valor por defecto.
 
 ### SSR y APIs del navegador
 
@@ -208,6 +229,7 @@ CREATE TABLE oportunidades (
                          CHECK (etapa IN ('nuevo','contactado','presupuesto_enviado',
                                           'negociacion','ganado','perdido')),
   fecha_cierre_estimada  TEXT,
+  fecha_cierre_real      TEXT,   -- se completa al pasar a 'ganado' o 'perdido'
   motivo_perdida         TEXT,
   creado_en              TEXT NOT NULL DEFAULT (datetime('now')),
   actualizado_en         TEXT NOT NULL DEFAULT (datetime('now'))
@@ -218,7 +240,7 @@ CREATE TABLE alertas (
   cliente_id         INTEGER NOT NULL REFERENCES clientes(id),
   vendedor_id        INTEGER NOT NULL REFERENCES usuarios(id),
   tipo               TEXT NOT NULL DEFAULT 'sin_contacto'
-                     CHECK (tipo IN ('sin_contacto','oportunidad_estancada')),
+                     CHECK (tipo IN ('sin_contacto','sin_compra','oportunidad_estancada')),
   dias_sin_contacto  INTEGER,
   mensaje            TEXT,
   estado             TEXT NOT NULL DEFAULT 'pendiente'
@@ -230,6 +252,11 @@ CREATE INDEX idx_clientes_vendedor      ON clientes(vendedor_id, eliminado);
 CREATE INDEX idx_interacciones_cliente  ON interacciones(cliente_id, fecha DESC);
 CREATE INDEX idx_oportunidades_etapa    ON oportunidades(etapa, vendedor_id);
 CREATE INDEX idx_alertas_estado         ON alertas(estado, vendedor_id);
+
+-- El cron corre todos los dias: esto impide que cree dos veces
+-- la misma alerta pendiente para el mismo cliente.
+CREATE UNIQUE INDEX idx_alertas_sin_duplicar
+  ON alertas(cliente_id, tipo) WHERE estado = 'pendiente';
 ```
 
 ### Reglas del modelo
@@ -240,6 +267,17 @@ CREATE INDEX idx_alertas_estado         ON alertas(estado, vendedor_id);
   ```sql
   CAST(julianday('now') - julianday(COALESCE(MAX(i.fecha), c.creado_en)) AS INTEGER)
   ```
+- **Días sin compra — no es lo mismo que días sin contacto.** El cliente pidio textual:
+  *"tengo clientes que compraban todos los meses y hace medio año no compran"*. Un cliente
+  puede tener una llamada de la semana pasada y no comprar hace ocho meses. No hay tabla de
+  pedidos (facturacion esta fuera de alcance), asi que se usa como proxy la **oportunidad
+  ganada mas reciente**:
+  ```sql
+  CAST(julianday('now') - julianday(MAX(o.fecha_cierre_real)) AS INTEGER)
+  -- sobre oportunidades del cliente con etapa = 'ganado'
+  ```
+  Las dos metricas se muestran juntas en la pantalla de clientes en riesgo, y el cron
+  genera alertas de los dos tipos (`sin_contacto` y `sin_compra`).
 
 ---
 
@@ -261,6 +299,13 @@ DELETE /api/clientes/:id        → borrado lógico, solo admin
 GET    /api/clientes/:id/interacciones
 POST   /api/clientes/:id/interacciones
 
+POST   /api/clientes/:id/contactos
+PATCH  /api/contactos/:id
+
+GET    /api/vendedores          → lista de vendedores (para filtros y reasignacion)
+POST   /api/clientes/reasignar  { cliente_ids: [], vendedor_destino } → solo admin
+PATCH  /api/usuarios/:id        → { activo: 0 } dar de baja un vendedor, solo admin
+
 GET    /api/oportunidades       ?etapa=&vendedor=
 POST   /api/oportunidades
 PATCH  /api/oportunidades/:id   → incluye cambio de etapa
@@ -268,8 +313,18 @@ PATCH  /api/oportunidades/:id   → incluye cambio de etapa
 GET    /api/alertas             → pendientes del usuario (todas si admin)
 PATCH  /api/alertas/:id         → { estado: 'vista' | 'resuelta' }
 
-GET    /api/dashboard           → métricas del admin
+GET    /api/dashboard           → métricas del admin, incluye presupuestos enviados por vendedor
 ```
+
+### Reasignación de cartera — es la respuesta al dolor principal
+
+La primera frase del cliente fue *"si un vendedor se va, se lleva los contactos y perdemos
+el cliente"*. Poder cambiar el `vendedor_id` de a un cliente por vez no alcanza para
+demostrar eso. `POST /api/clientes/reasignar` mueve varios clientes de un vendedor a otro
+en una sola operacion, y `PATCH /api/usuarios/:id` da de baja al que se fue.
+
+Toda la bitacora de `interacciones` queda intacta y sigue apuntando al usuario que la
+registro: el historico es de la empresa, la cartera se reasigna. Ese es el argumento.
 
 ### 🔒 Regla no negociable: el filtro por rol va en el servidor
 
@@ -294,7 +349,8 @@ No instalar librerías de auth pesadas: no hace falta y muchas no corren en Work
 1. **Login**
 2. **Listado de clientes** — tabla densa en escritorio, tarjetas en celular. Buscador. Chip de días sin contacto con color.
 3. **Ficha de cliente** — datos, contactos, timeline de interacciones, botón grande "Registrar contacto"
-4. **Clientes en riesgo** — ordenados por días sin contacto desc, con botón de WhatsApp
+4. **Clientes en riesgo** — ordenados por días sin contacto desc, con botón de WhatsApp.
+   Muestra **dos** métricas por cliente: días sin contacto y días sin compra (sección 5)
 5. **Pipeline** — columnas por etapa con monto total en cada una
 6. **Dashboard** — solo admin
 
@@ -348,7 +404,7 @@ Si hay dudas sobre una API de Angular, consultar la documentación actual antes 
 
 ### Entra (v1)
 
-Clientes, contactos, bitácora de interacciones, cartera por vendedor con permisos, pipeline con etapas cerradas, alertas de inactividad, dashboard, mobile, login.
+Clientes, contactos, bitácora de interacciones, cartera por vendedor con permisos, **reasignación de cartera entre vendedores**, pipeline con etapas cerradas, alertas de inactividad (sin contacto y sin compra), dashboard, mobile, login.
 
 ### No entra — **no implementar aunque parezca fácil**
 
