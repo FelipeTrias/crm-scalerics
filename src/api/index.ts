@@ -21,6 +21,8 @@ import {
 } from './rutas/clientes';
 import { editarAlerta, listarAlertas } from './rutas/alertas';
 import { editarUsuario, listarVendedores } from './rutas/usuarios';
+import { crearContacto, editarContacto } from './rutas/contactos';
+import { verDashboard } from './rutas/dashboard';
 import { crearInteraccion, listarInteracciones } from './rutas/interacciones';
 import { crearOportunidad, editarOportunidad, listarOportunidades } from './rutas/oportunidades';
 import type { Contexto, Entorno, Sesion } from './tipos';
@@ -65,6 +67,11 @@ const RUTAS: Ruta[] = [
 
   ruta('GET', '/api/vendedores', listarVendedores),
   ruta('PATCH', '/api/usuarios/:id', editarUsuario),
+
+  ruta('POST', '/api/clientes/:id/contactos', crearContacto),
+  ruta('PATCH', '/api/contactos/:id', editarContacto),
+
+  ruta('GET', '/api/dashboard', verDashboard),
 ];
 
 interface Coincidencia {
