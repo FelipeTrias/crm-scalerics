@@ -10,6 +10,7 @@
  * El motor que las crea vive en el paso del cron; aca solo se leen y se marcan.
  */
 import { enteroPositivo, error, esUnoDe, json, leerBody } from '../http';
+import { generarAlertas } from '../motor-alertas';
 import { esAdmin, filtroPorVendedor } from '../permisos';
 import type { Contexto, Sesion } from '../tipos';
 
@@ -86,4 +87,23 @@ export async function editarAlerta(ctx: Contexto, sesion: Sesion): Promise<Respo
   await ctx.env.DB.prepare('UPDATE alertas SET estado = ? WHERE id = ?').bind(body.estado, id).run();
 
   return json({ ok: true });
+}
+
+// ---------------------------------------------------------------------------
+//  POST /api/alertas/generar
+// ---------------------------------------------------------------------------
+
+/**
+ * Dispara el mismo motor que corre el cron.
+ *
+ * Existe por dos motivos: el dueño puede forzar una revision sin esperar a las
+ * 8 de la maniana, y sirve para probar la logica sin depender de
+ * `wrangler dev --test-scheduled`, que no funciona bien cuando el Worker
+ * ademas sirve assets estaticos.
+ */
+export async function generarAlertasAhora(ctx: Contexto, sesion: Sesion): Promise<Response> {
+  if (!esAdmin(sesion)) return error('Solo el administrador puede regenerar las alertas', 403);
+
+  const resumen = await generarAlertas(ctx.env.DB);
+  return json(resumen);
 }

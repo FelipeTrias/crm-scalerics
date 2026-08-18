@@ -1,9 +1,13 @@
 import { AngularAppEngine, createRequestHandler } from '@angular/ssr';
 import { manejarApi } from './api/index';
+import { generarAlertas } from './api/motor-alertas';
 import type { Entorno } from './api/tipos';
 
 const angularApp = new AngularAppEngine({
-  allowedHosts: ['localhost', 'crm-scalerics.felipetrias.workers.dev'],
+  // Si se agrega un dominio, va aca tambien. Sin esto Angular responde
+  // 'Header "host" with value "..." is not allowed.' y la app no carga.
+  // 127.0.0.1 esta porque wrangler dev anuncia esa forma, no "localhost".
+  allowedHosts: ['localhost', '127.0.0.1', 'crm-scalerics.felipetrias.workers.dev'],
 });
 
 /**
@@ -38,5 +42,19 @@ export default {
     // El handler de Angular solo acepta el Request: no necesita env ni ctx.
     const res = await reqHandler(request);
     return res ?? new Response('Page not found.', { status: 404 });
+  },
+
+  /**
+   * Cron diario. Montevideo es UTC-3 todo el año (Uruguay no tiene horario de
+   * verano desde 2015), asi que "0 11 * * *" son las 8:00 de la maniana:
+   * el vendedor se entera al arrancar el dia, no a media tarde.
+   */
+  async scheduled(_event: ScheduledController, env: Entorno, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(
+      generarAlertas(env.DB).then(
+        (r) => console.log('Alertas generadas:', JSON.stringify(r)),
+        (e) => console.error('Fallo la generacion de alertas', e),
+      ),
+    );
   },
 };

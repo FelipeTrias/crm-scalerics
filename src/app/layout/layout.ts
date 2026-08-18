@@ -29,6 +29,7 @@ import { Sesion } from '../nucleo/sesion';
       <a routerLink="/clientes" routerLinkActive="activo">Mi cartera</a>
       <a routerLink="/riesgo" routerLinkActive="activo">En riesgo</a>
       <a routerLink="/pipeline" routerLinkActive="activo">Pipeline</a>
+      <a routerLink="/alertas" routerLinkActive="activo">Alertas</a>
       @if (sesion.esAdmin()) {
         <a routerLink="/panel" routerLinkActive="activo">Panel</a>
       }
@@ -63,6 +64,13 @@ import { Sesion } from '../nucleo/sesion';
         </svg>
         Pipeline
       </a>
+      <a routerLink="/alertas" routerLinkActive="activo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <path d="M18 8a6 6 0 10-12 0c0 7-3 8-3 8h18s-3-1-3-8" />
+          <path d="M10 21h4" />
+        </svg>
+        Alertas
+      </a>
       @if (sesion.esAdmin()) {
         <a routerLink="/panel" routerLinkActive="activo">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
@@ -87,7 +95,7 @@ import { Sesion } from '../nucleo/sesion';
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 10px 14px;
+      padding: 10px var(--margen-lateral);
       background: var(--azul-900);
       color: #fff;
     }
@@ -152,7 +160,7 @@ import { Sesion } from '../nucleo/sesion';
     .nav-escritorio {
       display: flex;
       gap: 2px;
-      padding: 0 14px;
+      padding: 0 var(--margen-lateral);
       background: var(--azul-700);
     }
 
@@ -176,7 +184,8 @@ import { Sesion } from '../nucleo/sesion';
 
     .contenido {
       flex: 1;
-      padding: 14px;
+      width: 100%;
+      padding: 16px var(--margen-lateral) 24px;
     }
 
     .nav-celular {
@@ -230,8 +239,12 @@ import { Sesion } from '../nucleo/sesion';
         padding: 0 14px;
       }
 
+      .barra {
+        padding: 10px 12px;
+      }
+
       .contenido {
-        padding: 12px;
+        padding: 12px 12px 20px;
       }
     }
   `,

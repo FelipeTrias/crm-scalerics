@@ -39,6 +39,22 @@
 
   /* Alto de la barra inferior en celular, para que no tape contenido */
   --alto-nav: 56px;
+
+  /*
+   * Ancho maximo de la columna de contenido.
+   *
+   * Sin esto, en un monitor de 2000px las tablas y los botones se estiran de
+   * borde a borde y cuesta seguir una fila con la vista. Denso no es lo mismo
+   * que ancho: la densidad la dan las filas compactas, no el estirar.
+   */
+  --ancho-max: 1280px;
+
+  /*
+   * Centra el contenido sin envolverlo en otro div: el fondo sigue ocupando
+   * todo el ancho (las barras azules llegan hasta el borde) pero lo que esta
+   * adentro queda alineado en la misma columna.
+   */
+  --margen-lateral: max(14px, calc((100% - var(--ancho-max)) / 2));
 }
 
 * {

@@ -19,7 +19,7 @@ import {
   reasignarCartera,
   verCliente,
 } from './rutas/clientes';
-import { editarAlerta, listarAlertas } from './rutas/alertas';
+import { editarAlerta, generarAlertasAhora, listarAlertas } from './rutas/alertas';
 import { editarUsuario, listarVendedores } from './rutas/usuarios';
 import { crearContacto, editarContacto } from './rutas/contactos';
 import { verDashboard } from './rutas/dashboard';
@@ -63,6 +63,7 @@ const RUTAS: Ruta[] = [
   ruta('PATCH', '/api/oportunidades/:id', editarOportunidad),
 
   ruta('GET', '/api/alertas', listarAlertas),
+  ruta('POST', '/api/alertas/generar', generarAlertasAhora),
   ruta('PATCH', '/api/alertas/:id', editarAlerta),
 
   ruta('GET', '/api/vendedores', listarVendedores),

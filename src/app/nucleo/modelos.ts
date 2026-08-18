@@ -25,6 +25,9 @@ export interface Cliente {
   ultima_interaccion: string | null;
   dias_sin_contacto: number;
   dias_sin_compra: number | null;
+  /** Solo viene en el listado, para el boton de WhatsApp. */
+  contacto_principal?: string | null;
+  whatsapp?: string | null;
 }
 
 export interface Contacto {

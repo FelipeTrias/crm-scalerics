@@ -15,6 +15,10 @@
 		"enabled": true
 	},
 	"upload_source_maps": true,
+	// 0 11 UTC = 8:00 de Montevideo (UTC-3 todo el año, sin horario de verano)
+	"triggers": {
+		"crons": ["0 11 * * *"]
+	},
 	"d1_databases": [
 		{
 			"binding": "DB",

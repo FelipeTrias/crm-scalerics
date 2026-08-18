@@ -30,6 +30,8 @@ interface FilaCliente {
   dias_sin_contacto: number;
   dias_sin_compra: number | null;
   ultima_interaccion: string | null;
+  contacto_principal: string | null;
+  whatsapp: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -80,6 +82,12 @@ export async function listarClientes(ctx: Contexto, sesion: Sesion): Promise<Res
     'SELECT c.id, c.razon_social, c.nombre_fantasia, c.rut, c.direccion, c.ciudad, c.rubro, ' +
     '       c.estado, c.notas, c.vendedor_id, u.nombre AS vendedor_nombre, ' +
     '       MAX(i.fecha) AS ultima_interaccion, ' +
+    // El contacto principal viaja en la misma consulta para que el boton de
+    // WhatsApp de la pantalla de riesgo no necesite un pedido por cliente.
+    '       (SELECT ct.nombre FROM contactos ct WHERE ct.cliente_id = c.id ' +
+    '         ORDER BY ct.es_principal DESC, ct.id LIMIT 1) AS contacto_principal, ' +
+    '       (SELECT ct.whatsapp FROM contactos ct WHERE ct.cliente_id = c.id ' +
+    '         ORDER BY ct.es_principal DESC, ct.id LIMIT 1) AS whatsapp, ' +
     '       ' + SQL_DIAS_SIN_CONTACTO + ' AS dias_sin_contacto, ' +
     '       ' + SQL_DIAS_SIN_COMPRA + ' AS dias_sin_compra, ' +
     '       max(' + SQL_DIAS_SIN_CONTACTO + ', COALESCE(' + SQL_DIAS_SIN_COMPRA + ', 0)) AS prioridad ' +
