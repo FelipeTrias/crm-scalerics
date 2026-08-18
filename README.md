@@ -153,7 +153,8 @@ Y levantar:
 npm run preview
 ```
 
-Queda en `http://localhost:8788`. **`ng serve` no sirve para probar la API**: no pasa por el punto de
+Queda en **http://localhost:8787** (es el puerto por defecto de `wrangler dev`; lo anuncia en la
+consola al arrancar). **`ng serve` no sirve para probar la API**: no pasa por el punto de
 entrada del Worker, así que no hay `/api` ni base de datos.
 
 ### Desplegar

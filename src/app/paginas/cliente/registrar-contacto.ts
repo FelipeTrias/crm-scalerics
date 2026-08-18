@@ -1,4 +1,4 @@
-import { Component, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, inject, input, output, signal, viewChild, type WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api, mensajeDeError } from '../../nucleo/api';
 
@@ -9,10 +9,10 @@ import { Api, mensajeDeError } from '../../nucleo/api';
  * parado en la calle, con una mano, entre dos visitas. Tiene que llevarle
  * menos de 15 segundos.
  *
- * Por eso: cuatro campos, uno solo obligatorio, el tipo se elige de un toque
- * con botones grandes y el resto son listas desplegables con lo que se contesta
- * siempre. Escribir a mano es opcional. Si el formulario crece, nadie lo llena
- * y el CRM vuelve a ser el Excel de cada uno.
+ * Por eso todo se elige tocando: nada de listas desplegables. Cuatro campos,
+ * uno solo obligatorio, y pocas opciones por campo. Escribir a mano es
+ * opcional. Si el formulario crece, nadie lo llena y el CRM vuelve a ser el
+ * Excel de cada uno.
  */
 @Component({
   selector: 'app-registrar-contacto',
@@ -44,13 +44,20 @@ import { Api, mensajeDeError } from '../../nucleo/api';
         </div>
 
         <div class="campo">
-          <label class="etiqueta" for="resultado">C&oacute;mo sali&oacute;</label>
-          <select id="resultado" name="resultado" [(ngModel)]="resultado">
-            <option value="">Sin especificar</option>
+          <span class="etiqueta">&iquest;C&oacute;mo sali&oacute;?</span>
+          <div class="opciones">
             @for (r of RESULTADOS; track r) {
-              <option [value]="r">{{ r }}</option>
+              <button
+                type="button"
+                class="tipo"
+                [class.elegido]="resultado() === r"
+                [attr.aria-pressed]="resultado() === r"
+                (click)="alternar(resultado, r)"
+              >
+                {{ r }}
+              </button>
             }
-          </select>
+          </div>
         </div>
 
         <div class="campo">
@@ -59,15 +66,22 @@ import { Api, mensajeDeError } from '../../nucleo/api';
         </div>
 
         <div class="campo">
-          <label class="etiqueta" for="proxima">Pr&oacute;xima acci&oacute;n <span class="apagado">(opcional)</span></label>
-          <select id="proxima" name="proxima" [(ngModel)]="proximaAccion">
-            <option value="">Nada pendiente</option>
+          <span class="etiqueta">&iquest;Qu&eacute; queda pendiente? <span class="apagado">(opcional)</span></span>
+          <div class="opciones">
             @for (p of PROXIMAS; track p) {
-              <option [value]="p">{{ p }}</option>
+              <button
+                type="button"
+                class="tipo"
+                [class.elegido]="proximaAccion() === p"
+                [attr.aria-pressed]="proximaAccion() === p"
+                (click)="alternar(proximaAccion, p)"
+              >
+                {{ p }}
+              </button>
             }
-          </select>
-          @if (proximaAccion) {
-            <input type="date" name="proximaFecha" aria-label="Fecha de la proxima accion" [(ngModel)]="proximaFecha" />
+          </div>
+          @if (proximaAccion()) {
+            <input type="date" name="proximaFecha" aria-label="Cuando" [(ngModel)]="proximaFecha" />
           }
         </div>
 
@@ -106,6 +120,13 @@ import { Api, mensajeDeError } from '../../nucleo/api';
     .tipos {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+
+    /* Envuelve sola: en un celular entran tres por fila, en escritorio las cinco */
+    .opciones {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(102px, 1fr));
       gap: 6px;
     }
 
@@ -163,41 +184,38 @@ export class RegistrarContacto {
     { valor: 'email', texto: 'Email' },
   ] as const;
 
-  protected readonly RESULTADOS = [
-    'Pedido confirmado',
-    'Renovo pedido mensual',
-    'Quedo en confirmar',
-    'Pidio presupuesto',
-    'Pidio muestra',
-    'Solo consulta de precios',
-    'No estaba el encargado',
-    'Reclamo por entrega',
-    'Sin respuesta',
-    'Reprogramo la visita',
-  ];
+  /**
+   * Cinco resultados, no diez.
+   *
+   * La lista anterior tenia matices que solo importan a quien diseño el
+   * sistema ("pidio muestra" contra "solo consulta de precios"). Para el
+   * vendedor son todos "todavia no compro". Menos opciones y mas grandes se
+   * eligen de un toque; una lista larga obliga a leer y decidir, y ahi es
+   * donde se deja de registrar.
+   */
+  protected readonly RESULTADOS = ['Compro', 'Pidio precio', 'Lo va a pensar', 'No estaba', 'Reclamo'];
 
-  protected readonly PROXIMAS = [
-    'Llamar para cerrar el pedido',
-    'Pasar a dejar muestras',
-    'Enviar presupuesto actualizado',
-    'Visitar para relevar consumo',
-    'Confirmar fecha de entrega',
-  ];
+  protected readonly PROXIMAS = ['Llamar', 'Visitar', 'Pasar precio'];
 
   protected readonly tipo = signal<string>('llamada');
-  protected resultado = '';
+  protected readonly resultado = signal('');
+  protected readonly proximaAccion = signal('');
   protected notas = '';
-  protected proximaAccion = '';
   protected proximaFecha = '';
+
+  /** Tocar la opcion ya elegida la desmarca: no hace falta un "sin especificar". */
+  protected alternar(destino: WritableSignal<string>, valor: string): void {
+    destino.set(destino() === valor ? '' : valor);
+  }
 
   protected readonly guardando = signal(false);
   protected readonly error = signal('');
 
   abrir(): void {
     this.tipo.set('llamada');
-    this.resultado = '';
+    this.resultado.set('');
+    this.proximaAccion.set('');
     this.notas = '';
-    this.proximaAccion = '';
     this.proximaFecha = '';
     this.error.set('');
     this.dlg().nativeElement.showModal();
@@ -218,10 +236,10 @@ export class RegistrarContacto {
     try {
       await this.api.post(`/clientes/${this.clienteId()}/interacciones`, {
         tipo: this.tipo(),
-        resultado: this.resultado || null,
+        resultado: this.resultado() || null,
         notas: this.notas || null,
-        proxima_accion: this.proximaAccion || null,
-        proxima_accion_fecha: this.proximaAccion ? this.proximaFecha || null : null,
+        proxima_accion: this.proximaAccion() || null,
+        proxima_accion_fecha: this.proximaAccion() ? this.proximaFecha || null : null,
       });
       this.cerrar();
       this.registrado.emit();

@@ -117,7 +117,8 @@ const CLIENTES: Cli[] = [
 const NOMBRES = ['Andrea Rodriguez', 'Sebastian Fernandez', 'Mariana Techera', 'Diego Olivera', 'Carolina Suarez', 'Nicolas Ferreira', 'Paola Machado', 'Alvaro Gimenez', 'Silvana Cardozo', 'Fernando Rivas', 'Natalia Pereira', 'Gonzalo Melgar', 'Adriana Lopez', 'Javier Mendez', 'Romina Acosta', 'Pablo Duarte', 'Veronica Silveira', 'Marcelo Nunez', 'Cecilia Barrios', 'Leonardo Pintos'];
 const CARGOS = ['Encargado de compras', 'Administrador', 'Gerente general', 'Jefe de mantenimiento', 'Encargada de limpieza', 'Recepcion', 'Duenio'];
 const TIPOS = ['llamada', 'llamada', 'llamada', 'visita', 'visita', 'whatsapp', 'whatsapp', 'email'];
-const RESULTADOS = ['Pedido confirmado', 'Quedo en confirmar', 'Pidio presupuesto', 'No estaba el encargado', 'Reclamo por entrega', 'Solo consulta de precios', 'Renovo pedido mensual', 'Pidio muestra', 'Sin respuesta', 'Reprogramo la visita'];
+// Mismo vocabulario que los botones del formulario (registrar-contacto.ts)
+const RESULTADOS = ['Compro', 'Pidio precio', 'Lo va a pensar', 'No estaba', 'Reclamo'];
 const NOTAS = [
   'Repuso stock de detergente industrial y papel higienico institucional.',
   'Pidio cotizacion por 20 bidones de hipoclorito de 5 litros.',
@@ -132,7 +133,7 @@ const NOTAS = [
   'Pregunto por alcohol en gel institucional por bidon.',
   'Coordinamos entrega para la primera semana del mes que viene.',
 ];
-const PROXIMAS = ['Llamar para cerrar el pedido', 'Pasar a dejar muestras', 'Enviar presupuesto actualizado', 'Visitar para relevar consumo', 'Confirmar fecha de entrega', 'Llamar despues del 10'];
+const PROXIMAS = ['Llamar', 'Visitar', 'Pasar precio'];
 const TITULOS = ['Reposicion mensual de insumos', 'Provision de papel institucional', 'Contrato anual de limpieza', 'Kit inicial de dispensers', 'Compra de productos quimicos', 'Insumos para temporada alta', 'Provision de bolsas de residuo', 'Renovacion de contrato trimestral'];
 const MOTIVOS = ['Precio: la competencia cotizo mas barato', 'Se quedo con el proveedor actual', 'Postergo la compra para el proximo ejercicio', 'No hubo respuesta despues del presupuesto'];
 
