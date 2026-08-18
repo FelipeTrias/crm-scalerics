@@ -157,10 +157,13 @@ sql.push(
     '\n' +
     '-- Limpieza previa, en orden de dependencias. Permite re-aplicar el seed.\n' +
     'DELETE FROM alertas;\n' +
+    'DELETE FROM pedido_items;\n' +
+    'DELETE FROM pedidos;\n' +
     'DELETE FROM interacciones;\n' +
     'DELETE FROM oportunidades;\n' +
     'DELETE FROM contactos;\n' +
     'DELETE FROM clientes;\n' +
+    'DELETE FROM productos;\n' +
     'DELETE FROM usuarios;',
 );
 
@@ -328,6 +331,154 @@ for (let k = 0; k < 4; k++) {
   );
 }
 
+// ---------------------------------------------------------------------------
+//  Catalogo de productos
+//
+//  Insumos de limpieza institucional con precios plausibles en pesos uruguayos.
+//  El catalogo es lo que vuelve legible al pipeline: un pedido deja de ser
+//  "$ 11.000" y pasa a ser "20 bidones de hipoclorito a $ 380".
+// ---------------------------------------------------------------------------
+type Prod = { codigo: string; nombre: string; categoria: string; unidad: string; precio: number };
+
+const PRODUCTOS: Prod[] = [
+  { codigo: 'QUI-001', nombre: 'Detergente industrial concentrado', categoria: 'Quimicos', unidad: 'Bidon 5 L', precio: 520 },
+  { codigo: 'QUI-002', nombre: 'Hipoclorito de sodio 10%', categoria: 'Quimicos', unidad: 'Bidon 5 L', precio: 380 },
+  { codigo: 'QUI-003', nombre: 'Desengrasante para cocina industrial', categoria: 'Quimicos', unidad: 'Bidon 5 L', precio: 690 },
+  { codigo: 'QUI-004', nombre: 'Limpiavidrios', categoria: 'Quimicos', unidad: 'Bidon 5 L', precio: 450 },
+  { codigo: 'QUI-005', nombre: 'Limpiador de pisos perfumado', categoria: 'Quimicos', unidad: 'Bidon 5 L', precio: 410 },
+  { codigo: 'QUI-006', nombre: 'Alcohol en gel institucional', categoria: 'Quimicos', unidad: 'Bidon 5 L', precio: 780 },
+  { codigo: 'QUI-007', nombre: 'Desinfectante amonio cuaternario', categoria: 'Quimicos', unidad: 'Bidon 5 L', precio: 950 },
+  { codigo: 'QUI-008', nombre: 'Jabon liquido para dispenser', categoria: 'Quimicos', unidad: 'Bidon 5 L', precio: 560 },
+  { codigo: 'QUI-009', nombre: 'Cera autobrillante', categoria: 'Quimicos', unidad: 'Bidon 5 L', precio: 840 },
+  { codigo: 'QUI-010', nombre: 'Quitasarro para baños', categoria: 'Quimicos', unidad: 'Bidon 5 L', precio: 470 },
+
+  { codigo: 'PAP-001', nombre: 'Papel higienico institucional 300 m', categoria: 'Papel', unidad: 'Paquete x 8', precio: 1180 },
+  { codigo: 'PAP-002', nombre: 'Papel higienico hoja simple', categoria: 'Papel', unidad: 'Paquete x 4', precio: 340 },
+  { codigo: 'PAP-003', nombre: 'Toalla en rollo para dispenser 100 m', categoria: 'Papel', unidad: 'Paquete x 6', precio: 1450 },
+  { codigo: 'PAP-004', nombre: 'Toalla intercalada', categoria: 'Papel', unidad: 'Paquete x 250', precio: 290 },
+  { codigo: 'PAP-005', nombre: 'Servilletas', categoria: 'Papel', unidad: 'Paquete x 500', precio: 210 },
+
+  { codigo: 'BOL-001', nombre: 'Bolsa de residuo 60x90', categoria: 'Bolsas', unidad: 'Paquete x 100', precio: 620 },
+  { codigo: 'BOL-002', nombre: 'Bolsa de residuo 90x120 reforzada', categoria: 'Bolsas', unidad: 'Paquete x 100', precio: 980 },
+  { codigo: 'BOL-003', nombre: 'Bolsa de residuo 45x60', categoria: 'Bolsas', unidad: 'Paquete x 100', precio: 380 },
+
+  { codigo: 'ACC-001', nombre: 'Lampazo industrial con mango', categoria: 'Accesorios', unidad: 'Unidad', precio: 540 },
+  { codigo: 'ACC-002', nombre: 'Repuesto de lampazo', categoria: 'Accesorios', unidad: 'Unidad', precio: 230 },
+  { codigo: 'ACC-003', nombre: 'Trapo de piso', categoria: 'Accesorios', unidad: 'Paquete x 3', precio: 190 },
+  { codigo: 'ACC-004', nombre: 'Franela multiuso', categoria: 'Accesorios', unidad: 'Paquete x 6', precio: 260 },
+  { codigo: 'ACC-005', nombre: 'Escurridor de vidrios 45 cm', categoria: 'Accesorios', unidad: 'Unidad', precio: 610 },
+  { codigo: 'ACC-006', nombre: 'Balde escurridor 20 L', categoria: 'Accesorios', unidad: 'Unidad', precio: 1350 },
+  { codigo: 'ACC-007', nombre: 'Cepillo de mano', categoria: 'Accesorios', unidad: 'Unidad', precio: 180 },
+
+  { codigo: 'PRO-001', nombre: 'Guantes de latex descartables', categoria: 'Proteccion', unidad: 'Caja x 100', precio: 480 },
+  { codigo: 'PRO-002', nombre: 'Guantes de goma reforzados', categoria: 'Proteccion', unidad: 'Par', precio: 150 },
+
+  { codigo: 'DIS-001', nombre: 'Dispenser de jabon liquido 1 L', categoria: 'Dispensers', unidad: 'Unidad', precio: 890 },
+  { codigo: 'DIS-002', nombre: 'Dispenser de papel higienico institucional', categoria: 'Dispensers', unidad: 'Unidad', precio: 1240 },
+  { codigo: 'DIS-003', nombre: 'Dispenser de toalla en rollo', categoria: 'Dispensers', unidad: 'Unidad', precio: 1390 },
+];
+
+sql.push('\n-- ---------- productos ----------');
+PRODUCTOS.forEach((p, i) => {
+  sql.push(
+    'INSERT INTO productos (id, codigo, nombre, categoria, unidad, precio_lista, activo) VALUES (' +
+      [i + 1, txt(p.codigo), txt(p.nombre), txt(p.categoria), txt(p.unidad), p.precio, 1].join(', ') +
+      ');',
+  );
+});
+
+// ---------------------------------------------------------------------------
+//  Pedidos
+//
+//  Cada rubro compra lo suyo: un hotel repone papel y jabon todos los meses, un
+//  frigorifico compra hipoclorito y desengrasante por volumen. Sin esto los
+//  pedidos parecen sorteados y no se entiende que vende la empresa.
+//
+//  La fecha del pedido MAS RECIENTE de cada cliente es exactamente su valor de
+//  `compra`. De ahi sale "dias sin compra", asi que los tres casos que hacen
+//  entendible la pantalla de riesgo dependen de esto.
+// ---------------------------------------------------------------------------
+const codigo = (c: string) => PRODUCTOS.findIndex((p) => p.codigo === c) + 1;
+
+const AFINIDAD: Record<string, string[]> = {
+  Hoteleria: ['PAP-001', 'PAP-003', 'QUI-008', 'QUI-005', 'BOL-001', 'QUI-010', 'ACC-003'],
+  Salud: ['QUI-007', 'QUI-006', 'PAP-001', 'PRO-001', 'BOL-002', 'QUI-002', 'PAP-004'],
+  Educacion: ['QUI-008', 'PAP-002', 'QUI-005', 'BOL-001', 'ACC-003', 'PAP-004', 'ACC-001'],
+  Gastronomia: ['QUI-003', 'QUI-001', 'BOL-002', 'PAP-005', 'PRO-001', 'QUI-002', 'ACC-004'],
+  Deportes: ['QUI-005', 'QUI-007', 'PAP-001', 'BOL-001', 'QUI-006', 'QUI-008', 'ACC-001'],
+  Oficinas: ['PAP-001', 'PAP-004', 'QUI-008', 'QUI-004', 'BOL-003', 'ACC-005', 'ACC-004'],
+  Residencial: ['PAP-001', 'QUI-008', 'QUI-007', 'ACC-001', 'BOL-001', 'PAP-004', 'QUI-010'],
+  Industria: ['QUI-002', 'QUI-003', 'BOL-002', 'PRO-002', 'ACC-006', 'QUI-001', 'PRO-001'],
+  Comercio: ['BOL-001', 'QUI-005', 'PAP-001', 'ACC-004', 'QUI-004', 'PAP-005', 'ACC-003'],
+};
+
+/** Cantidades tipicas segun lo que es el producto. */
+function cantidadDe(cod: string): number {
+  if (cod.startsWith('DIS')) return entre(1, 4); // los dispensers se compran de a pocos
+  if (cod.startsWith('ACC') || cod.startsWith('PRO')) return entre(2, 10);
+  if (cod.startsWith('PAP') || cod.startsWith('BOL')) return entre(4, 25);
+  return entre(3, 20); // quimicos
+}
+
+sql.push('\n-- ---------- pedidos ----------');
+let idPedido = 0;
+let idItem = 0;
+let renglonesTotales = 0;
+
+CLIENTES.forEach((c, i) => {
+  if (c.compra === null) return; // los prospectos nunca compraron
+  const clienteId = i + 1;
+  const catalogo = AFINIDAD[c.rubro] ?? AFINIDAD['Comercio'];
+
+  // Entre 3 y 7 compras hacia atras, arrancando por la mas reciente.
+  const cuantos = entre(3, 7);
+  let dia = c.compra;
+
+  for (let k = 0; k < cuantos; k++) {
+    if (dia >= antiguedad[clienteId]) break;
+
+    // El mas reciente puede estar todavia sin entregar; los viejos ya se
+    // entregaron. Nunca se anula el ultimo: eso cambiaria los dias sin compra
+    // del cliente y romperia los casos preparados para la demo.
+    let estado = 'entregado';
+    if (k === 0 && dia < 7) estado = 'pendiente';
+    else if (k > 0 && azar() < 0.06) estado = 'anulado';
+
+    sql.push(
+      'INSERT INTO pedidos (id, cliente_id, vendedor_id, fecha, estado, notas, creado_por, creado_en) VALUES (' +
+        [
+          ++idPedido,
+          clienteId,
+          c.ven,
+          fechaHace(dia),
+          txt(estado),
+          'NULL',
+          c.ven,
+          haceDias(dia),
+        ].join(', ') +
+        ');',
+    );
+
+    // 2 a 5 renglones, sin repetir producto dentro del mismo pedido.
+    const cuantosItems = entre(2, 5);
+    const usados = new Set<string>();
+    for (let r = 0; r < cuantosItems; r++) {
+      const cod = unoDe(catalogo);
+      if (usados.has(cod)) continue;
+      usados.add(cod);
+      const prod = PRODUCTOS[codigo(cod) - 1];
+      sql.push(
+        'INSERT INTO pedido_items (id, pedido_id, producto_id, cantidad, precio_unitario) VALUES (' +
+          [++idItem, idPedido, codigo(cod), cantidadDe(cod), prod.precio].join(', ') +
+          ');',
+      );
+      renglonesTotales++;
+    }
+
+    dia += entre(25, 70);
+  }
+});
+
 writeFileSync(new URL('./seed.sql', import.meta.url), sql.join('\n') + '\n');
 
 console.log('db/seed.sql generado');
@@ -336,6 +487,9 @@ console.log('  clientes      ' + CLIENTES.length);
 console.log('  contactos     ' + idContacto);
 console.log('  interacciones ' + idInteraccion);
 console.log('  oportunidades ' + idOportunidad);
+console.log('  productos     ' + PRODUCTOS.length);
+console.log('  pedidos       ' + idPedido);
+console.log('  renglones     ' + renglonesTotales);
 console.log('  clientes en riesgo (>60 dias sin contacto): ' + CLIENTES.filter((c) => c.dias > 60).length);
 console.log('  clientes sin comprar hace mas de 180 dias : ' + CLIENTES.filter((c) => c.compra !== null && c.compra > 180).length);
 console.log('  clientes por vendedor: ' + [2, 3, 4, 5].map((v) => v + '=' + CLIENTES.filter((c) => c.ven === v).length).join('  '));

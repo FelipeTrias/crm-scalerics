@@ -28,15 +28,22 @@ export const SQL_DIAS_SIN_CONTACTO =
 /**
  * Dias desde la ultima compra. Devuelve NULL si el cliente nunca compro.
  *
- * No hay tabla de pedidos (facturacion esta fuera de alcance), asi que se usa
- * como proxy la oportunidad ganada mas reciente. Es una metrica distinta de la
- * de contacto: un cliente puede tener una visita de la semana pasada y no
- * comprar hace ocho meses, que es exactamente el caso que el cliente describio.
+ * Sale de la fecha del ultimo pedido, no de una estimacion: es un hecho, no un
+ * indicio. Los pedidos anulados no cuentan — un pedido que se dio de baja no es
+ * una compra.
+ *
+ * Es una metrica distinta de la de contacto: un cliente puede tener una visita
+ * de la semana pasada y no comprar hace ocho meses, que es exactamente el caso
+ * que el cliente describio. Por eso las dos se muestran juntas.
+ *
+ * Antes se usaba como proxy la oportunidad ganada mas reciente, porque no habia
+ * tabla de pedidos. La oportunidad sigue existiendo, pero ya no manda: una
+ * oportunidad ganada es "le vendi", un pedido es "compro esto".
  */
 export const SQL_DIAS_SIN_COMPRA =
-  "(SELECT CAST(julianday('now') - julianday(MAX(o.fecha_cierre_real)) AS INTEGER) " +
-  "FROM oportunidades o " +
-  "WHERE o.cliente_id = c.id AND o.etapa = 'ganado' AND o.fecha_cierre_real IS NOT NULL)";
+  "(SELECT CAST(julianday('now') - julianday(MAX(p.fecha)) AS INTEGER) " +
+  'FROM pedidos p ' +
+  "WHERE p.cliente_id = c.id AND p.estado <> 'anulado')";
 
 export const ESTADOS_CLIENTE = ['prospecto', 'activo', 'inactivo'] as const;
 export const TIPOS_INTERACCION = ['llamada', 'visita', 'whatsapp', 'email'] as const;
