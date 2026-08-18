@@ -11,7 +11,16 @@
  */
 import { error } from './http';
 import { login, logout, me, sesionDe } from './auth';
-import { crearCliente, editarCliente, eliminarCliente, listarClientes, verCliente } from './rutas/clientes';
+import {
+  crearCliente,
+  editarCliente,
+  eliminarCliente,
+  listarClientes,
+  reasignarCartera,
+  verCliente,
+} from './rutas/clientes';
+import { editarAlerta, listarAlertas } from './rutas/alertas';
+import { editarUsuario, listarVendedores } from './rutas/usuarios';
 import { crearInteraccion, listarInteracciones } from './rutas/interacciones';
 import { crearOportunidad, editarOportunidad, listarOportunidades } from './rutas/oportunidades';
 import type { Contexto, Entorno, Sesion } from './tipos';
@@ -37,6 +46,9 @@ const RUTAS: Ruta[] = [
 
   ruta('GET', '/api/clientes', listarClientes),
   ruta('POST', '/api/clientes', crearCliente),
+  // Va antes que /api/clientes/:id para que quede explicito que es una ruta
+  // literal y no un id. El matcher igual la encuentra, pero se lee mejor asi.
+  ruta('POST', '/api/clientes/reasignar', reasignarCartera),
   ruta('GET', '/api/clientes/:id', verCliente),
   ruta('PATCH', '/api/clientes/:id', editarCliente),
   ruta('DELETE', '/api/clientes/:id', eliminarCliente),
@@ -47,6 +59,12 @@ const RUTAS: Ruta[] = [
   ruta('GET', '/api/oportunidades', listarOportunidades),
   ruta('POST', '/api/oportunidades', crearOportunidad),
   ruta('PATCH', '/api/oportunidades/:id', editarOportunidad),
+
+  ruta('GET', '/api/alertas', listarAlertas),
+  ruta('PATCH', '/api/alertas/:id', editarAlerta),
+
+  ruta('GET', '/api/vendedores', listarVendedores),
+  ruta('PATCH', '/api/usuarios/:id', editarUsuario),
 ];
 
 interface Coincidencia {

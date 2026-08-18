@@ -303,3 +303,86 @@ export async function eliminarCliente(ctx: Contexto, sesion: Sesion): Promise<Re
   if (resultado.meta.changes === 0) return error('Cliente no encontrado', 404);
   return json({ ok: true });
 }
+
+// ---------------------------------------------------------------------------
+//  POST /api/clientes/reasignar
+// ---------------------------------------------------------------------------
+
+interface CuerpoReasignar {
+  /** Lista explicita de clientes a mover. */
+  cliente_ids?: unknown;
+  /** O bien: mover la cartera entera de un vendedor. */
+  vendedor_origen?: unknown;
+  vendedor_destino?: unknown;
+}
+
+/**
+ * Mueve clientes de un vendedor a otro.
+ *
+ * Este endpoint es la respuesta a "si un vendedor se va, se lleva los contactos
+ * y perdemos el cliente". Lo que se mueve y lo que no es deliberado:
+ *
+ *   - clientes: cambian de vendedor
+ *   - oportunidades ABIERTAS: siguen al cliente, porque hay que trabajarlas
+ *   - oportunidades cerradas: se quedan con quien las vendio, es el historico
+ *   - interacciones: NUNCA se tocan, siguen a nombre de quien las registro
+ *
+ * La bitacora es de la empresa y no se reescribe. Esa es toda la idea.
+ */
+export async function reasignarCartera(ctx: Contexto, sesion: Sesion): Promise<Response> {
+  if (!esAdmin(sesion)) return error('Solo el administrador puede reasignar cartera', 403);
+
+  const body = await leerBody<CuerpoReasignar>(ctx.request);
+  if (!body) return error('El cuerpo del pedido no es JSON valido', 400);
+
+  const destino = enteroPositivo(body.vendedor_destino);
+  if (!destino) return error('Hay que indicar el vendedor destino', 400);
+  if (!(await esVendedorValido(ctx, destino))) {
+    return error('El vendedor destino no existe o esta dado de baja', 400);
+  }
+
+  const condiciones = ['eliminado = 0', 'vendedor_id <> ?'];
+  const params: unknown[] = [destino];
+
+  if (Array.isArray(body.cliente_ids) && body.cliente_ids.length > 0) {
+    if (body.cliente_ids.length > 500) return error('No se pueden reasignar mas de 500 clientes por vez', 400);
+    const ids = body.cliente_ids.map(enteroPositivo);
+    if (ids.some((x) => x === null)) return error('La lista de clientes tiene ids invalidos', 400);
+    condiciones.push('id IN (' + ids.map(() => '?').join(', ') + ')');
+    params.push(...ids);
+  } else {
+    const origen = enteroPositivo(body.vendedor_origen);
+    if (!origen) return error('Hay que indicar cliente_ids o vendedor_origen', 400);
+    if (origen === destino) return error('El vendedor de origen y el de destino son el mismo', 400);
+    condiciones.push('vendedor_id = ?');
+    params.push(origen);
+  }
+
+  // Se resuelve primero que clientes se mueven y recien despues se actualiza.
+  // Si se actualizara directo por vendedor_origen, la segunda consulta (la de
+  // oportunidades) ya no encontraria nada: los clientes habrian cambiado de
+  // dueño en el paso anterior.
+  const { results } = await ctx.env.DB.prepare(
+    'SELECT id FROM clientes WHERE ' + condiciones.join(' AND '),
+  )
+    .bind(...params)
+    .all<{ id: number }>();
+
+  const ids = results.map((r) => r.id);
+  if (ids.length === 0) return json({ clientes_reasignados: 0, oportunidades_reasignadas: 0 });
+
+  const marcadores = ids.map(() => '?').join(', ');
+  const [clientes, oportunidades] = await ctx.env.DB.batch([
+    ctx.env.DB.prepare('UPDATE clientes SET vendedor_id = ? WHERE id IN (' + marcadores + ')').bind(destino, ...ids),
+    ctx.env.DB.prepare(
+      "UPDATE oportunidades SET vendedor_id = ?, actualizado_en = datetime('now') " +
+        ' WHERE cliente_id IN (' + marcadores + ')' +
+        "   AND etapa NOT IN ('ganado', 'perdido')",
+    ).bind(destino, ...ids),
+  ]);
+
+  return json({
+    clientes_reasignados: clientes.meta.changes,
+    oportunidades_reasignadas: oportunidades.meta.changes,
+  });
+}
