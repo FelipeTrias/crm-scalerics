@@ -1,0 +1,4 @@
+/* El armazon lo pone cada pagina; app-root solo hospeda el router. */
+:host {
+  display: contents;
+}

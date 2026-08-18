@@ -1,1 +1,373 @@
-/* You can add global styles to this file, and also import other style files */
+/* ============================================================================
+   CRM Scalerics — estilos base
+
+   La paleta sale de CLAUDE.md seccion 7. No se adapta al tema del sistema
+   operativo: es la identidad de la empresa, azul y gris, y tiene que verse
+   igual en el celular de cada vendedor.
+
+   Criterio general: "simple tipo Excel pero mejor" es densidad de informacion
+   y pocos clics, no minimalismo con mucho aire. Filas compactas, todo a la
+   vista, y areas tactiles de 44px donde se toca con el dedo.
+   ========================================================================= */
+
+:root {
+  --azul-900: #0b2545;
+  --azul-700: #134074;
+  --azul-500: #1b6ca8;
+  --gris-700: #4a5568;
+  --gris-300: #cbd5e0;
+  --gris-100: #f5f7fa;
+  --verde: #2e9e5b;
+  --amarillo: #e0a800;
+  --rojo: #d64545;
+
+  /* Fondos de estado, derivados de la paleta */
+  --verde-suave: #e7f4ec;
+  --amarillo-suave: #fbf2d9;
+  --rojo-suave: #fbe9e9;
+  --azul-suave: #e8eff6;
+
+  --fondo: #eef1f6;
+  --superficie: #ffffff;
+  --borde: #dde3ec;
+  --texto: #16233a;
+  --texto-suave: var(--gris-700);
+  --fila-alt: #fafbfd;
+
+  --radio: 8px;
+  --sombra: 0 1px 2px rgb(11 37 69 / 0.06), 0 4px 16px rgb(11 37 69 / 0.06);
+
+  /* Alto de la barra inferior en celular, para que no tape contenido */
+  --alto-nav: 56px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--fondo);
+  color: var(--texto);
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+
+:focus-visible {
+  outline: 2px solid var(--azul-500);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ─────────────────────────── Tipografia ─────────────────────────── */
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: 1.25rem;
+}
+
+h2 {
+  font-size: 1.1rem;
+}
+
+.apagado {
+  color: var(--texto-suave);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.etiqueta {
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--texto-suave);
+}
+
+/* ─────────────────────────── Formularios ─────────────────────────── */
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+input[type='text'],
+input[type='email'],
+input[type='password'],
+input[type='search'],
+input[type='date'],
+select,
+textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  color: var(--texto);
+  font: inherit;
+  font-size: 1rem; /* 16px evita que iOS haga zoom al enfocar */
+}
+
+textarea {
+  padding: 10px 12px;
+  min-height: 88px;
+  resize: vertical;
+}
+
+input::placeholder {
+  color: #97a2b4;
+}
+
+.boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radio);
+  background: var(--azul-700);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.boton:hover:not(:disabled) {
+  background: var(--azul-900);
+}
+
+.boton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.boton.secundario {
+  background: var(--superficie);
+  border-color: var(--borde);
+  color: var(--texto);
+}
+
+.boton.secundario:hover:not(:disabled) {
+  background: var(--gris-100);
+}
+
+.boton.whatsapp {
+  background: var(--verde);
+}
+
+.boton.whatsapp:hover:not(:disabled) {
+  background: #268a4e;
+}
+
+/* ─────────────────────────── Cajas y tablas ─────────────────────────── */
+
+.caja {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  overflow: hidden;
+}
+
+/* Todo lo ancho scrollea dentro de su caja: el body nunca se mueve de costado */
+.desplazable {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  padding: 8px 12px;
+  background: var(--gris-100);
+  border-bottom: 1px solid var(--borde);
+  text-align: left;
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--gris-700);
+  white-space: nowrap;
+}
+
+tbody td {
+  padding: 7px 12px;
+  border-bottom: 1px solid #eef1f6;
+  white-space: nowrap;
+}
+
+tbody tr:nth-child(even) {
+  background: var(--fila-alt);
+}
+
+tbody tr:hover {
+  background: var(--azul-suave);
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.principal {
+  font-weight: 600;
+}
+
+.secundario {
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+}
+
+/* ─────────────────────────── Chips ───────────────────────────
+
+   Semaforo de contacto (CLAUDE.md seccion 7):
+     < 30 verde · 30-60 amarillo · > 60 rojo
+   ──────────────────────────────────────────────────────────── */
+
+.chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.chip .u {
+  font-weight: 500;
+  font-size: 0.7rem;
+  opacity: 0.85;
+}
+
+.chip.verde {
+  background: var(--verde-suave);
+  color: #1d6b3c;
+}
+
+.chip.amarillo {
+  background: var(--amarillo-suave);
+  color: #8a6500;
+}
+
+.chip.rojo {
+  background: var(--rojo-suave);
+  color: #a52e2e;
+}
+
+.chip.neutro {
+  background: var(--gris-100);
+  color: var(--gris-700);
+}
+
+.estado {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.estado.activo {
+  background: var(--verde-suave);
+  color: #1d6b3c;
+  border-color: #bfe3cd;
+}
+
+.estado.prospecto {
+  background: var(--azul-suave);
+  color: var(--azul-700);
+  border-color: #c3d6e8;
+}
+
+.estado.inactivo {
+  background: var(--gris-100);
+  color: var(--gris-700);
+  border-color: var(--gris-300);
+}
+
+/* ─────────────────────────── Tarjetas (celular) ─────────────────────────── */
+
+.tarjetas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.tarjeta .arriba {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.tarjeta .abajo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ─────────────────────────── Mensajes ─────────────────────────── */
+
+.error {
+  padding: 10px 12px;
+  border: 1px solid #f0c4c4;
+  border-left: 4px solid var(--rojo);
+  border-radius: var(--radio);
+  background: var(--rojo-suave);
+  color: #8f2626;
+  font-size: 0.88rem;
+}
+
+.vacio {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--texto-suave);
+  font-size: 0.92rem;
+}
