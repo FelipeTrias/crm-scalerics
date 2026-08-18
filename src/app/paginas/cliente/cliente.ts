@@ -91,7 +91,7 @@ import { RegistrarContacto } from './registrar-contacto';
         } @else {
           <ul class="pedidos">
             @for (p of pedidos(); track p.id) {
-              <li [class.anulado]="p.estado === 'anulado'">
+              <li [class.anulado]="p.estado === 'anulado' || p.estado === 'perdido'">
                 <div class="cabecera-pedido">
                   <div>
                     <span class="principal num">{{ moneda(p.total) }}</span>
@@ -314,11 +314,18 @@ import { RegistrarContacto } from './registrar-contacto';
       color: #1d6b3c;
     }
 
-    .estado-pedido.pendiente {
+    .estado-pedido.confirmado {
+      background: var(--azul-suave);
+      color: var(--azul-700);
+    }
+
+    /* Un presupuesto todavia no es una venta: amarillo, esta en el aire */
+    .estado-pedido.presupuesto {
       background: var(--amarillo-suave);
       color: #8a6500;
     }
 
+    .estado-pedido.perdido,
     .estado-pedido.anulado {
       background: var(--gris-100);
       color: var(--gris-700);

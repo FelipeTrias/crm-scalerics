@@ -31,7 +31,7 @@ G="$DIR/c-gustavo.txt"; M="$DIR/c-martin.txt"; L="$DIR/c-lucia.txt"
 
 echo "── 1. Sin sesion: todo cerrado ──"
 for r in "GET /api/me" "GET /api/clientes" "GET /api/clientes/1" "GET /api/clientes/1/interacciones" \
-         "GET /api/oportunidades" "GET /api/alertas" "GET /api/vendedores" "GET /api/dashboard"; do
+         "GET /api/pipeline" "GET /api/alertas" "GET /api/vendedores" "GET /api/dashboard"; do
   probar "$r" 401 -X "${r% *}" "$B${r#* }"
 done
 probar "POST /api/clientes"            401 -X POST   "$B/api/clientes"            -H "$J" -d '{"razon_social":"X"}'
@@ -39,7 +39,9 @@ probar "POST /api/clientes/reasignar"  401 -X POST   "$B/api/clientes/reasignar"
 probar "PATCH /api/clientes/1"         401 -X PATCH  "$B/api/clientes/1"          -H "$J" -d '{"notas":"x"}'
 probar "DELETE /api/clientes/1"        401 -X DELETE "$B/api/clientes/1"
 probar "PATCH /api/usuarios/2"         401 -X PATCH  "$B/api/usuarios/2"          -H "$J" -d '{"activo":0}'
-probar "PATCH /api/oportunidades/1"    401 -X PATCH  "$B/api/oportunidades/1"     -H "$J" -d '{"etapa":"ganado"}'
+probar "PATCH /api/pedidos/1"       401 -X PATCH  "$B/api/pedidos/1"          -H "$J" -d '{"estado":"entregado"}'
+probar "POST /api/clientes/1/pedidos" 401 -X POST   "$B/api/clientes/1/pedidos" -H "$J" -d '{"items":[]}'
+probar "GET /api/productos"          401 "$B/api/productos"
 probar "PATCH /api/alertas/1"          401 -X PATCH  "$B/api/alertas/1"           -H "$J" -d '{"estado":"vista"}'
 probar "POST /api/clientes/1/contactos" 401 -X POST  "$B/api/clientes/1/contactos" -H "$J" -d '{"nombre":"X"}'
 probar "PATCH /api/contactos/1"        401 -X PATCH  "$B/api/contactos/1"         -H "$J" -d '{"cargo":"X"}'
@@ -62,8 +64,9 @@ probar "PATCH cliente ajeno -> 403"        403 -b "$M" -X PATCH "$B/api/clientes
 probar "POST interaccion ajena -> 403"     403 -b "$M" -X POST "$B/api/clientes/1/interacciones" -H "$J" -d '{"tipo":"llamada"}'
 probar "POST contacto ajeno -> 403"        403 -b "$M" -X POST "$B/api/clientes/1/contactos" -H "$J" -d '{"nombre":"X"}'
 probar "PATCH contacto ajeno -> 403"       403 -b "$M" -X PATCH "$B/api/contactos/1" -H "$J" -d '{"cargo":"X"}'
-probar "POST oportunidad ajena -> 403"     403 -b "$M" -X POST "$B/api/oportunidades" -H "$J" -d '{"cliente_id":1,"titulo":"X"}'
-probar "PATCH oportunidad ajena -> 403"    403 -b "$M" -X PATCH "$B/api/oportunidades/1" -H "$J" -d '{"etapa":"ganado"}'
+probar "POST pedido en cliente ajeno -> 403" 403 -b "$M" -X POST "$B/api/clientes/1/pedidos" -H "$J" -d '{"items":[{"producto_id":11,"cantidad":2}]}'
+probar "PATCH pedido ajeno -> 403"    403 -b "$M" -X PATCH "$B/api/pedidos/1" -H "$J" -d '{"estado":"anulado"}'
+probar "GET pedidos de cliente ajeno -> 404" 404 -b "$M" "$B/api/clientes/1/pedidos"
 
 echo "── 4. Operaciones reservadas al dueño ──"
 probar "DELETE cliente propio -> 403"      403 -b "$M" -X DELETE "$B/api/clientes/2"
@@ -89,8 +92,8 @@ comprobar_lista() {
 comprobar_lista "clientes de martin"                  "$M" "$B/api/clientes" "2"
 comprobar_lista "martin forzando ?vendedor=3"         "$M" "$B/api/clientes?vendedor=3" "2"
 comprobar_lista "martin forzando ?vendedor=3 riesgo"  "$M" "$B/api/clientes?riesgo=true&vendedor=3" "2"
-comprobar_lista "oportunidades de martin"             "$M" "$B/api/oportunidades" "2"
-comprobar_lista "oportunidades forzando ?vendedor=3"  "$M" "$B/api/oportunidades?vendedor=3" "2"
+comprobar_lista "pipeline de martin"             "$M" "$B/api/pipeline" "2"
+comprobar_lista "pipeline forzando ?vendedor=3"  "$M" "$B/api/pipeline?vendedor=3" "2"
 
 echo
 printf '  RESULTADO: \033[32m%s OK\033[0m, \033[31m%s fallas\033[0m\n' "$ok" "$fallo"

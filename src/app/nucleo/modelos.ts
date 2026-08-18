@@ -52,23 +52,11 @@ export interface Interaccion {
   usuario_nombre: string;
 }
 
-export interface Oportunidad {
-  id: number;
-  titulo: string;
-  monto_estimado: number | null;
-  moneda: 'UYU' | 'USD';
-  etapa: 'nuevo' | 'contactado' | 'presupuesto_enviado' | 'negociacion' | 'ganado' | 'perdido';
-  fecha_cierre_estimada: string | null;
-  fecha_cierre_real: string | null;
-  motivo_perdida: string | null;
-}
-
 /** Respuesta de GET /api/clientes/:id */
 export interface FichaCliente {
   cliente: Cliente;
   contactos: Contacto[];
   interacciones: Interaccion[];
-  oportunidades: Oportunidad[];
 }
 
 export interface Vendedor {
@@ -99,7 +87,14 @@ export interface PedidoItem {
   precio_unitario: number;
 }
 
-export type EstadoPedido = 'pendiente' | 'entregado' | 'anulado';
+/**
+ * Un presupuesto es un pedido que todavia no se confirmo.
+ *
+ *     presupuesto -> confirmado -> entregado
+ *          |             |
+ *       perdido       anulado
+ */
+export type EstadoPedido = 'presupuesto' | 'confirmado' | 'entregado' | 'perdido' | 'anulado';
 
 export interface Pedido {
   id: number;

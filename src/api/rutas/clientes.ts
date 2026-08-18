@@ -139,7 +139,7 @@ export async function verCliente(ctx: Contexto, sesion: Sesion): Promise<Respons
   // 404 y no 403: un 403 confirmaria que el cliente existe y de quien es.
   if (!cliente) return error('Cliente no encontrado', 404);
 
-  const [contactos, interacciones, oportunidades] = await ctx.env.DB.batch([
+  const [contactos, interacciones] = await ctx.env.DB.batch([
     ctx.env.DB.prepare(
       'SELECT id, nombre, cargo, telefono, whatsapp, email, es_principal ' +
         'FROM contactos WHERE cliente_id = ? ORDER BY es_principal DESC, id',
@@ -150,17 +150,12 @@ export async function verCliente(ctx: Contexto, sesion: Sesion): Promise<Respons
         '  FROM interacciones i JOIN usuarios u ON u.id = i.usuario_id ' +
         ' WHERE i.cliente_id = ? ORDER BY i.fecha DESC LIMIT 50',
     ).bind(id),
-    ctx.env.DB.prepare(
-      'SELECT id, titulo, monto_estimado, moneda, etapa, fecha_cierre_estimada, fecha_cierre_real, motivo_perdida ' +
-        'FROM oportunidades WHERE cliente_id = ? ORDER BY creado_en DESC',
-    ).bind(id),
   ]);
 
   return json({
     cliente,
     contactos: contactos.results,
     interacciones: interacciones.results,
-    oportunidades: oportunidades.results,
   });
 }
 
@@ -331,8 +326,8 @@ interface CuerpoReasignar {
  * y perdemos el cliente". Lo que se mueve y lo que no es deliberado:
  *
  *   - clientes: cambian de vendedor
- *   - oportunidades ABIERTAS: siguen al cliente, porque hay que trabajarlas
- *   - oportunidades cerradas: se quedan con quien las vendio, es el historico
+ *   - presupuestos y pedidos confirmados: siguen al cliente, hay que trabajarlos
+ *   - pedidos ya cerrados: se quedan con quien vendio, es el historico
  *   - interacciones: NUNCA se tocan, siguen a nombre de quien las registro
  *
  * La bitacora es de la empresa y no se reescribe. Esa es toda la idea.
@@ -368,7 +363,7 @@ export async function reasignarCartera(ctx: Contexto, sesion: Sesion): Promise<R
 
   // Se resuelve primero que clientes se mueven y recien despues se actualiza.
   // Si se actualizara directo por vendedor_origen, la segunda consulta (la de
-  // oportunidades) ya no encontraria nada: los clientes habrian cambiado de
+  // pedidos) ya no encontraria nada: los clientes habrian cambiado de
   // dueño en el paso anterior.
   const { results } = await ctx.env.DB.prepare(
     'SELECT id FROM clientes WHERE ' + condiciones.join(' AND '),
@@ -377,20 +372,20 @@ export async function reasignarCartera(ctx: Contexto, sesion: Sesion): Promise<R
     .all<{ id: number }>();
 
   const ids = results.map((r) => r.id);
-  if (ids.length === 0) return json({ clientes_reasignados: 0, oportunidades_reasignadas: 0 });
+  if (ids.length === 0) return json({ clientes_reasignados: 0, pedidos_reasignados: 0 });
 
   const marcadores = ids.map(() => '?').join(', ');
-  const [clientes, oportunidades] = await ctx.env.DB.batch([
+  const [clientes, pedidos] = await ctx.env.DB.batch([
     ctx.env.DB.prepare('UPDATE clientes SET vendedor_id = ? WHERE id IN (' + marcadores + ')').bind(destino, ...ids),
     ctx.env.DB.prepare(
-      "UPDATE oportunidades SET vendedor_id = ?, actualizado_en = datetime('now') " +
+      'UPDATE pedidos SET vendedor_id = ? ' +
         ' WHERE cliente_id IN (' + marcadores + ')' +
-        "   AND etapa NOT IN ('ganado', 'perdido')",
+        "   AND estado IN ('presupuesto', 'confirmado')",
     ).bind(destino, ...ids),
   ]);
 
   return json({
     clientes_reasignados: clientes.meta.changes,
-    oportunidades_reasignadas: oportunidades.meta.changes,
+    pedidos_reasignados: pedidos.meta.changes,
   });
 }

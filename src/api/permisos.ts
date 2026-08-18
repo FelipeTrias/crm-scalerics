@@ -28,7 +28,7 @@ export function esAdmin(sesion: Sesion): boolean {
  * - admin: ve todo, y opcionalmente filtra con ?vendedor=N
  *
  * `columna` se recibe por parametro porque segun la consulta el alias cambia
- * (c.vendedor_id en clientes, o.vendedor_id en oportunidades). Nunca viene del
+ * (c.vendedor_id en clientes, p.vendedor_id en pedidos). Nunca viene del
  * request: la elige el codigo que arma la consulta.
  */
 export function filtroPorVendedor(sesion: Sesion, url: URL, columna: string): Filtro {

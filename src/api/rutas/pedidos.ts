@@ -13,7 +13,7 @@
  */
 import { clienteAccesible, esRespuesta } from '../acceso';
 import { enteroPositivo, error, esUnoDe, fechaIsoValida, json, leerBody, textoNoVacio, textoOpcional } from '../http';
-import { esAdmin } from '../permisos';
+import { esAdmin, filtroPorVendedor } from '../permisos';
 import { ESTADOS_PEDIDO, SQL_TOTAL_PEDIDO } from '../reglas';
 import type { Contexto, Sesion } from '../tipos';
 
@@ -32,6 +32,62 @@ export async function listarProductos(ctx: Contexto): Promise<Response> {
   ).all();
 
   return json({ productos: results });
+}
+
+// ---------------------------------------------------------------------------
+//  GET /api/pipeline
+// ---------------------------------------------------------------------------
+
+/**
+ * El tablero.
+ *
+ * Reemplaza al viejo listado de oportunidades. Cada tarjeta es un pedido de
+ * verdad, con sus renglones, asi que el monto de cada columna sale de sumar
+ * cantidades por precios y no de un numero tipeado a mano.
+ *
+ * Los estados cerrados se limitan a los ultimos 60 dias: con todo el historico,
+ * la columna "entregado" tendria cientos de tarjetas y el tablero dejaria de
+ * servir para ver que hay en juego hoy.
+ */
+const DIAS_CERRADOS = 60;
+
+export async function verPipeline(ctx: Contexto, sesion: Sesion): Promise<Response> {
+  const condiciones: string[] = ['c.eliminado = 0'];
+  const params: unknown[] = [];
+
+  const alcance = filtroPorVendedor(sesion, ctx.url, 'p.vendedor_id');
+  if (alcance.sql) {
+    condiciones.push(alcance.sql);
+    params.push(...alcance.params);
+  }
+
+  condiciones.push(
+    "(p.estado IN ('presupuesto','confirmado') OR p.fecha >= date('now','-" + DIAS_CERRADOS + " days'))",
+  );
+
+  const where = ' WHERE ' + condiciones.join(' AND ');
+
+  const [lista, resumen] = await ctx.env.DB.batch([
+    ctx.env.DB.prepare(
+      'SELECT p.id, p.cliente_id, c.razon_social, c.nombre_fantasia, p.vendedor_id, ' +
+        '       u.nombre AS vendedor_nombre, p.fecha, p.estado, p.notas, ' +
+        '       ' + SQL_TOTAL_PEDIDO + ' AS total, ' +
+        '       (SELECT COUNT(*) FROM pedido_items i WHERE i.pedido_id = p.id) AS renglones ' +
+        '  FROM pedidos p ' +
+        '  JOIN clientes c ON c.id = p.cliente_id ' +
+        '  JOIN usuarios u ON u.id = p.vendedor_id ' +
+        where +
+        ' ORDER BY p.fecha DESC, p.id DESC',
+    ).bind(...params),
+    ctx.env.DB.prepare(
+      'SELECT p.estado, COUNT(*) AS cantidad, COALESCE(SUM(' + SQL_TOTAL_PEDIDO + '), 0) AS monto_total ' +
+        '  FROM pedidos p JOIN clientes c ON c.id = p.cliente_id ' +
+        where +
+        ' GROUP BY p.estado',
+    ).bind(...params),
+  ]);
+
+  return json({ pedidos: lista.results, resumen: resumen.results, dias_cerrados: DIAS_CERRADOS });
 }
 
 // ---------------------------------------------------------------------------
@@ -118,7 +174,8 @@ export async function crearPedido(ctx: Contexto, sesion: Sesion): Promise<Respon
     return error('Un pedido no puede tener mas de ' + MAX_RENGLONES + ' renglones', 400);
   }
 
-  const estado = body.estado === undefined || body.estado === null ? 'pendiente' : body.estado;
+  // Por defecto es un presupuesto: primero se cotiza y despues se confirma.
+  const estado = body.estado === undefined || body.estado === null ? 'presupuesto' : body.estado;
   if (!esUnoDe(estado, ESTADOS_PEDIDO)) return error('Estado de pedido invalido', 400);
 
   let fecha: string | null = null;

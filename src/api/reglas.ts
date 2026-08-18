@@ -28,33 +28,24 @@ export const SQL_DIAS_SIN_CONTACTO =
 /**
  * Dias desde la ultima compra. Devuelve NULL si el cliente nunca compro.
  *
- * Sale de la fecha del ultimo pedido, no de una estimacion: es un hecho, no un
- * indicio. Los pedidos anulados no cuentan — un pedido que se dio de baja no es
- * una compra.
+ * Sale de la fecha del ultimo pedido confirmado o entregado. Un presupuesto no
+ * cuenta (todavia no compro), y uno perdido o anulado tampoco.
  *
  * Es una metrica distinta de la de contacto: un cliente puede tener una visita
  * de la semana pasada y no comprar hace ocho meses, que es exactamente el caso
  * que el cliente describio. Por eso las dos se muestran juntas.
  *
- * Antes se usaba como proxy la oportunidad ganada mas reciente, porque no habia
- * tabla de pedidos. La oportunidad sigue existiendo, pero ya no manda: una
- * oportunidad ganada es "le vendi", un pedido es "compro esto".
+ * Antes de que existieran los pedidos esto se estimaba con la oportunidad
+ * ganada mas reciente. Las oportunidades ya no existen: un presupuesto es un
+ * pedido sin confirmar, y la venta es el mismo registro un estado mas adelante.
  */
 export const SQL_DIAS_SIN_COMPRA =
   "(SELECT CAST(julianday('now') - julianday(MAX(p.fecha)) AS INTEGER) " +
   'FROM pedidos p ' +
-  "WHERE p.cliente_id = c.id AND p.estado <> 'anulado')";
+  "WHERE p.cliente_id = c.id AND p.estado IN ('confirmado','entregado'))";
 
 export const ESTADOS_CLIENTE = ['prospecto', 'activo', 'inactivo'] as const;
 export const TIPOS_INTERACCION = ['llamada', 'visita', 'whatsapp', 'email'] as const;
-export const ETAPAS_OPORTUNIDAD = [
-  'nuevo',
-  'contactado',
-  'presupuesto_enviado',
-  'negociacion',
-  'ganado',
-  'perdido',
-] as const;
 export const MONEDAS = ['UYU', 'USD'] as const;
 
 /**
@@ -70,4 +61,14 @@ export const SQL_TOTAL_PEDIDO =
   '(SELECT COALESCE(SUM(i.cantidad * i.precio_unitario), 0) ' +
   'FROM pedido_items i WHERE i.pedido_id = p.id)';
 
-export const ESTADOS_PEDIDO = ['pendiente', 'entregado', 'anulado'] as const;
+/**
+ * Estados de un pedido. Un presupuesto es un pedido que todavia no se confirmo.
+ *
+ *     presupuesto  ->  confirmado  ->  entregado
+ *          |               |
+ *       perdido         anulado
+ */
+export const ESTADOS_PEDIDO = ['presupuesto', 'confirmado', 'entregado', 'perdido', 'anulado'] as const;
+
+/** Los unicos estados que significan que el cliente compro. */
+export const ESTADOS_VENDIDOS = "('confirmado','entregado')";

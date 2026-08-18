@@ -79,28 +79,6 @@ CREATE TABLE interacciones (
 );
 
 -- ---------------------------------------------------------------------------
---  oportunidades — el pipeline. fecha_cierre_real sobre etapa 'ganado'
---  es el proxy de "ultima compra" (ver CLAUDE.md seccion 5).
--- ---------------------------------------------------------------------------
-CREATE TABLE oportunidades (
-  id                     INTEGER PRIMARY KEY AUTOINCREMENT,
-  cliente_id             INTEGER NOT NULL REFERENCES clientes(id),
-  vendedor_id            INTEGER NOT NULL REFERENCES usuarios(id),
-  titulo                 TEXT NOT NULL,
-  monto_estimado         REAL,
-  moneda                 TEXT NOT NULL DEFAULT 'UYU'
-                         CHECK (moneda IN ('UYU','USD')),
-  etapa                  TEXT NOT NULL DEFAULT 'nuevo'
-                         CHECK (etapa IN ('nuevo','contactado','presupuesto_enviado',
-                                          'negociacion','ganado','perdido')),
-  fecha_cierre_estimada  TEXT,
-  fecha_cierre_real      TEXT,   -- se completa al pasar a 'ganado' o 'perdido'
-  motivo_perdida         TEXT,
-  creado_en              TEXT NOT NULL DEFAULT (datetime('now')),
-  actualizado_en         TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
--- ---------------------------------------------------------------------------
 --  alertas — lo que genera el cron diario. Es el registro de que se aviso,
 --  no la fuente de la pantalla de clientes en riesgo (esa sale de la query).
 -- ---------------------------------------------------------------------------
@@ -131,7 +109,10 @@ CREATE TABLE productos (
 );
 
 -- ---------------------------------------------------------------------------
---  pedidos — lo que el cliente compro de verdad
+--  pedidos — el presupuesto y la venta son la misma cosa
+--
+--  Un presupuesto es un pedido que todavia no se confirmo:
+--    presupuesto -> confirmado -> entregado,  y perdido / anulado
 --
 --  Un pedido no es una factura: no hay impuestos, remito ni cuenta corriente.
 --  Es el registro comercial de que hubo una venta, con que y cuando.
@@ -143,8 +124,8 @@ CREATE TABLE pedidos (
   -- las oportunidades. Distinto de creado_por, que es quien lo tecleo.
   vendedor_id  INTEGER NOT NULL REFERENCES usuarios(id),
   fecha        TEXT NOT NULL DEFAULT (date('now')),
-  estado       TEXT NOT NULL DEFAULT 'pendiente'
-               CHECK (estado IN ('pendiente','entregado','anulado')),
+  estado       TEXT NOT NULL DEFAULT 'presupuesto'
+               CHECK (estado IN ('presupuesto','confirmado','entregado','perdido','anulado')),
   notas        TEXT,
   creado_por   INTEGER REFERENCES usuarios(id),
   creado_en    TEXT NOT NULL DEFAULT (datetime('now'))
@@ -173,6 +154,7 @@ CREATE TABLE pedido_items (
 
 CREATE INDEX idx_pedidos_cliente      ON pedidos(cliente_id, fecha DESC);
 CREATE INDEX idx_pedidos_vendedor     ON pedidos(vendedor_id, fecha DESC);
+CREATE INDEX idx_pedidos_estado       ON pedidos(estado, fecha DESC);
 CREATE INDEX idx_pedido_items_pedido  ON pedido_items(pedido_id);
 
 -- ---------------------------------------------------------------------------
@@ -186,7 +168,6 @@ CREATE INDEX idx_clientes_vendedor      ON clientes(vendedor_id, eliminado);
 CREATE INDEX idx_interacciones_cliente  ON interacciones(cliente_id, fecha DESC);
 
 -- Pipeline agrupado por etapa.
-CREATE INDEX idx_oportunidades_etapa    ON oportunidades(etapa, vendedor_id);
 
 -- Campanita de alertas pendientes del usuario.
 CREATE INDEX idx_alertas_estado         ON alertas(estado, vendedor_id);

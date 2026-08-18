@@ -21,11 +21,10 @@ import {
 } from './rutas/clientes';
 import { editarAlerta, generarAlertasAhora, listarAlertas } from './rutas/alertas';
 import { editarUsuario, listarVendedores } from './rutas/usuarios';
-import { crearPedido, editarPedido, listarPedidos, listarProductos } from './rutas/pedidos';
+import { crearPedido, editarPedido, listarPedidos, listarProductos, verPipeline } from './rutas/pedidos';
 import { crearContacto, editarContacto } from './rutas/contactos';
 import { verDashboard } from './rutas/dashboard';
 import { crearInteraccion, listarInteracciones } from './rutas/interacciones';
-import { crearOportunidad, editarOportunidad, listarOportunidades } from './rutas/oportunidades';
 import type { Contexto, Entorno, Sesion } from './tipos';
 
 type Manejador = (ctx: Contexto, sesion: Sesion) => Promise<Response> | Response;
@@ -59,9 +58,7 @@ const RUTAS: Ruta[] = [
   ruta('GET', '/api/clientes/:id/interacciones', listarInteracciones),
   ruta('POST', '/api/clientes/:id/interacciones', crearInteraccion),
 
-  ruta('GET', '/api/oportunidades', listarOportunidades),
-  ruta('POST', '/api/oportunidades', crearOportunidad),
-  ruta('PATCH', '/api/oportunidades/:id', editarOportunidad),
+  ruta('GET', '/api/pipeline', verPipeline),
 
   ruta('GET', '/api/alertas', listarAlertas),
   ruta('POST', '/api/alertas/generar', generarAlertasAhora),

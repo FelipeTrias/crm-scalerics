@@ -2,37 +2,43 @@ import { Component, afterNextRender, computed, inject, signal } from '@angular/c
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Api, mensajeDeError } from '../../nucleo/api';
+import { fechaCorta, moneda } from '../../nucleo/formato';
+import type { EstadoPedido } from '../../nucleo/modelos';
 import { Sesion } from '../../nucleo/sesion';
 
-interface OportunidadLista {
+interface PedidoTablero {
   id: number;
   cliente_id: number;
   razon_social: string;
   nombre_fantasia: string | null;
   vendedor_id: number;
   vendedor_nombre: string;
-  titulo: string;
-  monto_estimado: number | null;
-  moneda: 'UYU' | 'USD';
-  etapa: string;
-  fecha_cierre_estimada: string | null;
+  fecha: string;
+  estado: EstadoPedido;
+  notas: string | null;
+  total: number;
+  renglones: number;
 }
 
-interface ResumenEtapa {
-  etapa: string;
+interface ResumenEstado {
+  estado: EstadoPedido;
   cantidad: number;
   monto_total: number;
 }
 
 /**
- * Pipeline por etapas.
+ * Pipeline de ventas.
  *
  * Responde a "hoy eso me lo dicen de palabra en la reunion de los lunes y
- * siempre esta todo en proceso, nunca se bien". Las etapas son cerradas y cada
- * columna muestra cuantas oportunidades hay y cuanta plata representan.
+ * siempre esta todo en proceso, nunca se bien".
  *
- * El cambio de etapa es un <select>, no arrastrar y soltar: funciona igual en
- * el celular, que es donde se usa, y no depende de ninguna libreria.
+ * Cada tarjeta es un pedido de verdad. Antes eran "oportunidades" con un titulo
+ * escrito a mano y un monto inventado: se veian presupuestos de $123.000 para
+ * clientes que compran $20.000. Ahora el monto sale de los renglones, asi que
+ * lo que muestra cada columna es plata que existe.
+ *
+ * El cambio de estado es un <select>, no arrastrar y soltar: funciona igual con
+ * el dedo, que es donde se usa, y no suma dependencias.
  */
 @Component({
   selector: 'app-pipeline',
@@ -40,7 +46,10 @@ interface ResumenEtapa {
   template: `
     <div class="titulo">
       <h2>Pipeline</h2>
-      <span class="apagado num">{{ totalAbiertas() }} abiertas &middot; {{ moneda(totalMonto()) }}</span>
+      <span class="apagado num">
+        {{ resumenDe('presupuesto').cantidad }} presupuestos sin responder &middot;
+        {{ moneda(resumenDe('presupuesto').monto_total) }}
+      </span>
     </div>
 
     @if (error()) {
@@ -51,7 +60,7 @@ interface ResumenEtapa {
       <p class="vacio">Cargando pipeline...</p>
     } @else {
       <div class="tablero desplazable">
-        @for (e of ETAPAS; track e.valor) {
+        @for (e of ESTADOS; track e.valor) {
           <section class="columna">
             <header class="cabecera-col" [class]="e.valor">
               <div class="nombre">{{ e.texto }}</div>
@@ -62,36 +71,44 @@ interface ResumenEtapa {
             </header>
 
             <div class="pila">
-              @for (o of porEtapa()[e.valor]; track o.id) {
-                <article class="oportunidad">
-                  <a class="enlace" [routerLink]="['/clientes', o.cliente_id]">
-                    <div class="principal">{{ o.nombre_fantasia || o.razon_social }}</div>
+              @for (p of porEstado()[e.valor]; track p.id) {
+                <article class="pedido">
+                  <a class="enlace" [routerLink]="['/clientes', p.cliente_id]">
+                    <div class="principal">{{ p.nombre_fantasia || p.razon_social }}</div>
                   </a>
-                  <div class="secundario">{{ o.titulo }}</div>
                   <div class="pie">
-                    <span class="num plata">{{ moneda(o.monto_estimado ?? 0) }}</span>
-                    @if (sesion.esAdmin()) {
-                      <span class="secundario">{{ o.vendedor_nombre }}</span>
-                    }
+                    <span class="num plata">{{ moneda(p.total) }}</span>
+                    <span class="secundario num">{{ p.renglones }} prod. &middot; {{ fechaCorta(p.fecha) }}</span>
                   </div>
+                  @if (sesion.esAdmin()) {
+                    <div class="secundario">{{ p.vendedor_nombre }}</div>
+                  }
+                  @if (p.notas) {
+                    <div class="secundario motivo">{{ p.notas }}</div>
+                  }
                   <select
-                    aria-label="Cambiar etapa"
-                    [ngModel]="o.etapa"
-                    (ngModelChange)="cambiarEtapa(o, $event)"
-                    [disabled]="moviendo() === o.id"
+                    aria-label="Cambiar estado"
+                    [ngModel]="p.estado"
+                    (ngModelChange)="cambiarEstado(p, $event)"
+                    [disabled]="moviendo() === p.id"
                   >
-                    @for (x of ETAPAS; track x.valor) {
+                    @for (x of ESTADOS; track x.valor) {
                       <option [value]="x.valor">{{ x.texto }}</option>
                     }
                   </select>
                 </article>
               } @empty {
-                <p class="apagado sin-nada">Sin oportunidades</p>
+                <p class="apagado sin-nada">Nada por ac&aacute;</p>
               }
             </div>
           </section>
         }
       </div>
+
+      <p class="nota apagado">
+        Los presupuestos y los pedidos confirmados se muestran todos. Los cerrados
+        (entregados, perdidos y anulados) se limitan a los &uacute;ltimos {{ diasCerrados() }} d&iacute;as.
+      </p>
     }
   `,
   styles: `
@@ -107,8 +124,6 @@ interface ResumenEtapa {
       margin-bottom: 12px;
     }
 
-    /* En escritorio entran las seis columnas; en celular se arrastra de
-       costado, dentro del tablero y no del body. */
     .tablero {
       display: grid;
       grid-auto-flow: column;
@@ -132,15 +147,26 @@ interface ResumenEtapa {
       gap: 8px;
       padding: 8px 10px;
       border-radius: var(--radio);
-      background: var(--azul-700);
+      background: var(--azul-500);
       color: #fff;
     }
 
-    .cabecera-col.ganado {
+    /* El color cuenta la historia: azul lo que esta en juego, verde lo cerrado
+       bien, gris lo que ya no sigue. */
+    .cabecera-col.presupuesto {
+      background: var(--azul-700);
+    }
+
+    .cabecera-col.confirmado {
+      background: var(--azul-500);
+    }
+
+    .cabecera-col.entregado {
       background: var(--verde);
     }
 
-    .cabecera-col.perdido {
+    .cabecera-col.perdido,
+    .cabecera-col.anulado {
       background: var(--gris-700);
     }
 
@@ -173,7 +199,7 @@ interface ResumenEtapa {
       gap: 6px;
     }
 
-    .oportunidad {
+    .pedido {
       display: flex;
       flex-direction: column;
       gap: 4px;
@@ -202,10 +228,14 @@ interface ResumenEtapa {
 
     .plata {
       font-weight: 650;
-      font-size: 0.9rem;
+      font-size: 0.95rem;
     }
 
-    .oportunidad select {
+    .motivo {
+      font-style: italic;
+    }
+
+    .pedido select {
       min-height: 38px;
       font-size: 0.82rem;
       padding: 0 8px;
@@ -217,12 +247,17 @@ interface ResumenEtapa {
       text-align: center;
     }
 
+    .nota {
+      margin: 10px 0 0;
+      font-size: 0.75rem;
+    }
+
     @media (max-width: 760px) {
       .tablero {
         grid-auto-columns: 78vw;
       }
 
-      .oportunidad select {
+      .pedido select {
         min-height: 44px;
       }
     }
@@ -232,62 +267,56 @@ export class Pipeline {
   private readonly api = inject(Api);
   protected readonly sesion = inject(Sesion);
 
-  protected readonly ETAPAS = [
-    { valor: 'nuevo', texto: 'Nuevo' },
-    { valor: 'contactado', texto: 'Contactado' },
-    { valor: 'presupuesto_enviado', texto: 'Presupuesto enviado' },
-    { valor: 'negociacion', texto: 'Negociacion' },
-    { valor: 'ganado', texto: 'Ganado' },
+  protected readonly moneda = moneda;
+  protected readonly fechaCorta = fechaCorta;
+
+  protected readonly ESTADOS = [
+    { valor: 'presupuesto', texto: 'Presupuesto' },
+    { valor: 'confirmado', texto: 'Confirmado' },
+    { valor: 'entregado', texto: 'Entregado' },
     { valor: 'perdido', texto: 'Perdido' },
+    { valor: 'anulado', texto: 'Anulado' },
   ] as const;
 
-  protected readonly oportunidades = signal<OportunidadLista[]>([]);
-  protected readonly resumen = signal<ResumenEtapa[]>([]);
+  protected readonly pedidos = signal<PedidoTablero[]>([]);
+  protected readonly resumen = signal<ResumenEstado[]>([]);
+  protected readonly diasCerrados = signal(60);
   protected readonly cargando = signal(true);
   protected readonly moviendo = signal<number | null>(null);
   protected readonly error = signal('');
 
-  protected readonly porEtapa = computed(() => {
-    const mapa: Record<string, OportunidadLista[]> = {};
-    for (const e of this.ETAPAS) mapa[e.valor] = [];
-    for (const o of this.oportunidades()) mapa[o.etapa]?.push(o);
+  protected readonly porEstado = computed(() => {
+    const mapa: Record<string, PedidoTablero[]> = {};
+    for (const e of this.ESTADOS) mapa[e.valor] = [];
+    for (const p of this.pedidos()) mapa[p.estado]?.push(p);
     return mapa;
   });
-
-  /** Solo lo que sigue en juego: ganado y perdido ya no son pipeline. */
-  protected readonly totalAbiertas = computed(
-    () => this.oportunidades().filter((o) => o.etapa !== 'ganado' && o.etapa !== 'perdido').length,
-  );
-
-  protected readonly totalMonto = computed(() =>
-    this.oportunidades()
-      .filter((o) => o.etapa !== 'ganado' && o.etapa !== 'perdido')
-      .reduce((suma, o) => suma + (o.monto_estimado ?? 0), 0),
-  );
 
   constructor() {
     afterNextRender(() => void this.cargar());
   }
 
-  protected moneda(valor: number): string {
-    return '$ ' + Math.round(valor).toLocaleString('es-UY');
+  protected resumenDe(estado: string): ResumenEstado {
+    return (
+      this.resumen().find((r) => r.estado === estado) ?? {
+        estado: estado as EstadoPedido,
+        cantidad: 0,
+        monto_total: 0,
+      }
+    );
   }
 
-  protected resumenDe(etapa: string): ResumenEtapa {
-    return this.resumen().find((r) => r.etapa === etapa) ?? { etapa, cantidad: 0, monto_total: 0 };
-  }
-
-  protected async cambiarEtapa(o: OportunidadLista, etapa: string): Promise<void> {
-    if (etapa === o.etapa) return;
-    this.moviendo.set(o.id);
+  protected async cambiarEstado(p: PedidoTablero, estado: string): Promise<void> {
+    if (estado === p.estado) return;
+    this.moviendo.set(p.id);
     this.error.set('');
     try {
-      await this.api.patch(`/oportunidades/${o.id}`, { etapa });
-      // Se recarga entero: al pasar a ganado el servidor sella la fecha de
-      // cierre, y de eso dependen los dias sin compra del cliente.
+      await this.api.patch(`/pedidos/${p.id}`, { estado });
+      // Se recarga entero: confirmar un presupuesto cambia los dias sin compra
+      // del cliente, y los totales de dos columnas a la vez.
       await this.cargar();
     } catch (e) {
-      this.error.set(mensajeDeError(e, 'No se pudo cambiar la etapa'));
+      this.error.set(mensajeDeError(e, 'No se pudo cambiar el estado'));
     } finally {
       this.moviendo.set(null);
     }
@@ -296,9 +325,14 @@ export class Pipeline {
   private async cargar(): Promise<void> {
     this.cargando.set(true);
     try {
-      const r = await this.api.get<{ oportunidades: OportunidadLista[]; resumen: ResumenEtapa[] }>('/oportunidades');
-      this.oportunidades.set(r.oportunidades);
+      const r = await this.api.get<{
+        pedidos: PedidoTablero[];
+        resumen: ResumenEstado[];
+        dias_cerrados: number;
+      }>('/pipeline');
+      this.pedidos.set(r.pedidos);
       this.resumen.set(r.resumen);
+      this.diasCerrados.set(r.dias_cerrados);
     } catch (e) {
       this.error.set(mensajeDeError(e, 'No se pudo cargar el pipeline'));
     } finally {

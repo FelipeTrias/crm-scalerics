@@ -49,7 +49,7 @@ const USUARIOS = [
 //  Clientes
 //    ven    = vendedor_id (cada vendedor tiene su zona)
 //    dias   = dias desde la ultima interaccion -> define el semaforo
-//    compra = dias desde la ultima compra (oportunidad ganada); null = nunca compro
+//    compra = dias desde el ultimo pedido confirmado; null = nunca compro
 //
 //  Los valores estan elegidos a proposito, no al azar:
 //    - 10 clientes con mas de 60 dias sin contacto -> pantalla de riesgo
@@ -134,7 +134,6 @@ const NOTAS = [
   'Coordinamos entrega para la primera semana del mes que viene.',
 ];
 const PROXIMAS = ['Llamar', 'Visitar', 'Pasar precio'];
-const TITULOS = ['Reposicion mensual de insumos', 'Provision de papel institucional', 'Contrato anual de limpieza', 'Kit inicial de dispensers', 'Compra de productos quimicos', 'Insumos para temporada alta', 'Provision de bolsas de residuo', 'Renovacion de contrato trimestral'];
 const MOTIVOS = ['Precio: la competencia cotizo mas barato', 'Se quedo con el proveedor actual', 'Postergo la compra para el proximo ejercicio', 'No hubo respuesta despues del presupuesto'];
 
 // ---------------------------------------------------------------------------
@@ -161,7 +160,6 @@ sql.push(
     'DELETE FROM pedido_items;\n' +
     'DELETE FROM pedidos;\n' +
     'DELETE FROM interacciones;\n' +
-    'DELETE FROM oportunidades;\n' +
     'DELETE FROM contactos;\n' +
     'DELETE FROM clientes;\n' +
     'DELETE FROM productos;\n' +
@@ -245,92 +243,6 @@ CLIENTES.forEach((c, i) => {
   }
 });
 
-// --- oportunidades ---
-sql.push('\n-- ---------- oportunidades ----------');
-let idOportunidad = 0;
-const monto = () => entre(8, 150) * 1000;
-
-// Ganadas: una por cliente que tenga fecha de ultima compra.
-// Son las que alimentan la metrica "dias sin compra".
-sql.push('\n-- Ganadas: definen la ultima compra de cada cliente.');
-CLIENTES.forEach((c, i) => {
-  if (c.compra === null) return;
-  sql.push(
-    'INSERT INTO oportunidades (id, cliente_id, vendedor_id, titulo, monto_estimado, moneda, etapa, fecha_cierre_estimada, fecha_cierre_real, creado_en, actualizado_en) VALUES (' +
-      [
-        ++idOportunidad,
-        i + 1,
-        c.ven,
-        txt(unoDe(TITULOS)),
-        monto(),
-        "'UYU'",
-        "'ganado'",
-        fechaHace(c.compra + entre(3, 10)),
-        fechaHace(c.compra),
-        haceDias(c.compra + entre(20, 60)),
-        haceDias(c.compra),
-      ].join(', ') +
-      ');',
-  );
-});
-
-// Abiertas: son las que se ven en el pipeline.
-sql.push('\n-- Abiertas: lo que se ve en el pipeline.');
-const ABIERTAS: Array<[string, number]> = [
-  ['nuevo', 4],
-  ['contactado', 5],
-  ['presupuesto_enviado', 8],
-  ['negociacion', 7],
-];
-const candidatos = CLIENTES.map((c, i) => ({ c, id: i + 1 })).filter((x) => x.c.estado !== 'inactivo');
-let cursor = 0;
-for (const [etapa, cuantas] of ABIERTAS) {
-  for (let k = 0; k < cuantas; k++) {
-    const { c, id } = candidatos[cursor++ % candidatos.length];
-    const antig = entre(4, 70);
-    sql.push(
-      'INSERT INTO oportunidades (id, cliente_id, vendedor_id, titulo, monto_estimado, moneda, etapa, fecha_cierre_estimada, creado_en, actualizado_en) VALUES (' +
-        [
-          ++idOportunidad,
-          id,
-          c.ven,
-          txt(unoDe(TITULOS)),
-          monto(),
-          "'UYU'",
-          txt(etapa),
-          fechaEn(entre(5, 45)),
-          haceDias(antig),
-          haceDias(entre(1, Math.max(1, antig - 1))),
-        ].join(', ') +
-        ');',
-    );
-  }
-}
-
-// Perdidas: sirven para que el pipeline no se vea artificialmente sano.
-sql.push('\n-- Perdidas, con motivo.');
-for (let k = 0; k < 4; k++) {
-  const { c, id } = candidatos[cursor++ % candidatos.length];
-  const cerrada = entre(30, 150);
-  sql.push(
-    'INSERT INTO oportunidades (id, cliente_id, vendedor_id, titulo, monto_estimado, moneda, etapa, fecha_cierre_estimada, fecha_cierre_real, motivo_perdida, creado_en, actualizado_en) VALUES (' +
-      [
-        ++idOportunidad,
-        id,
-        c.ven,
-        txt(unoDe(TITULOS)),
-        monto(),
-        "'UYU'",
-        "'perdido'",
-        fechaHace(cerrada + entre(5, 15)),
-        fechaHace(cerrada),
-        txt(unoDe(MOTIVOS)),
-        haceDias(cerrada + entre(20, 60)),
-        haceDias(cerrada),
-      ].join(', ') +
-      ');',
-  );
-}
 
 // ---------------------------------------------------------------------------
 //  Catalogo de productos
@@ -441,8 +353,11 @@ CLIENTES.forEach((c, i) => {
     // El mas reciente puede estar todavia sin entregar; los viejos ya se
     // entregaron. Nunca se anula el ultimo: eso cambiaria los dias sin compra
     // del cliente y romperia los casos preparados para la demo.
+    // El mas reciente puede estar confirmado y sin entregar. El umbral es
+    // generoso a proposito: si ninguno cayera en 'confirmado', esa columna del
+    // pipeline quedaria vacia en la demo.
     let estado = 'entregado';
-    if (k === 0 && dia < 7) estado = 'pendiente';
+    if (k === 0 && dia < 30) estado = 'confirmado';
     else if (k > 0 && azar() < 0.06) estado = 'anulado';
 
     sql.push(
@@ -480,6 +395,77 @@ CLIENTES.forEach((c, i) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+//  Presupuestos abiertos y perdidos
+//
+//  Son lo que se ve en el pipeline. Antes eran "oportunidades" con un monto
+//  tipeado a mano; ahora son pedidos sin confirmar, con los mismos renglones
+//  que cualquier venta. Por eso el monto de cada tarjeta del pipeline sale de
+//  multiplicar cantidades por precios y guarda relacion con lo que ese cliente
+//  compra de verdad.
+// ---------------------------------------------------------------------------
+const MOTIVOS_PERDIDA = [
+  'La competencia cotizo mas barato',
+  'Se quedo con el proveedor actual',
+  'Postergo la compra para el proximo ejercicio',
+  'No hubo respuesta despues del presupuesto',
+];
+
+sql.push('\n-- ---------- presupuestos abiertos y perdidos ----------');
+
+/** Escribe los renglones de un pedido y devuelve cuantos puso. */
+function renglonesPara(pedidoId: number, rubro: string): number {
+  const catalogo = AFINIDAD[rubro] ?? AFINIDAD['Comercio'];
+  const usados = new Set<string>();
+  let puestos = 0;
+  const cuantos = entre(2, 5);
+  for (let r = 0; r < cuantos; r++) {
+    const cod = unoDe(catalogo);
+    if (usados.has(cod)) continue;
+    usados.add(cod);
+    const prod = PRODUCTOS[codigo(cod) - 1];
+    sql.push(
+      'INSERT INTO pedido_items (id, pedido_id, producto_id, cantidad, precio_unitario) VALUES (' +
+        [++idItem, pedidoId, codigo(cod), cantidadDe(cod), prod.precio].join(', ') +
+        ');',
+    );
+    puestos++;
+  }
+  return puestos;
+}
+
+// Solo clientes que no estan inactivos: no se presupuesta a quien dejo de operar.
+const activos = CLIENTES.map((c, i) => ({ c, id: i + 1 })).filter((x) => x.c.estado !== 'inactivo');
+let cursor = 0;
+let presupuestos = 0;
+let perdidos = 0;
+
+for (let k = 0; k < 24; k++) {
+  const { c, id } = activos[cursor++ % activos.length];
+  const dia = entre(2, 70);
+  sql.push(
+    'INSERT INTO pedidos (id, cliente_id, vendedor_id, fecha, estado, notas, creado_por, creado_en) VALUES (' +
+      [++idPedido, id, c.ven, fechaHace(dia), "'presupuesto'", 'NULL', c.ven, haceDias(dia)].join(', ') +
+      ');',
+  );
+  renglonesTotales += renglonesPara(idPedido, c.rubro);
+  presupuestos++;
+}
+
+for (let k = 0; k < 6; k++) {
+  const { c, id } = activos[cursor++ % activos.length];
+  // Dentro de los 60 dias que muestra el pipeline: un tablero con la columna
+  // "Perdido" siempre vacia no cuenta la historia completa.
+  const dia = entre(6, 55);
+  sql.push(
+    'INSERT INTO pedidos (id, cliente_id, vendedor_id, fecha, estado, notas, creado_por, creado_en) VALUES (' +
+      [++idPedido, id, c.ven, fechaHace(dia), "'perdido'", txt(unoDe(MOTIVOS_PERDIDA)), c.ven, haceDias(dia)].join(', ') +
+      ');',
+  );
+  renglonesTotales += renglonesPara(idPedido, c.rubro);
+  perdidos++;
+}
+
 writeFileSync(new URL('./seed.sql', import.meta.url), sql.join('\n') + '\n');
 
 console.log('db/seed.sql generado');
@@ -487,7 +473,8 @@ console.log('  usuarios      ' + USUARIOS.length);
 console.log('  clientes      ' + CLIENTES.length);
 console.log('  contactos     ' + idContacto);
 console.log('  interacciones ' + idInteraccion);
-console.log('  oportunidades ' + idOportunidad);
+console.log('  presupuestos  ' + presupuestos);
+console.log('  perdidos      ' + perdidos);
 console.log('  productos     ' + PRODUCTOS.length);
 console.log('  pedidos       ' + idPedido);
 console.log('  renglones     ' + renglonesTotales);

@@ -22,8 +22,8 @@ interface PorVendedor {
   monto_vendido: number;
 }
 
-interface PorEtapa {
-  etapa: string;
+interface PorEstado {
+  estado: string;
   cantidad: number;
   monto_total: number;
 }
@@ -72,7 +72,7 @@ interface RiesgoVendedor {
         <div class="cifra">
           <span class="valor num">{{ moneda(r.monto_en_pipeline) }}</span>
           <span class="etiqueta">En el pipeline</span>
-          <span class="detalle apagado">Oportunidades abiertas</span>
+          <span class="detalle apagado">Presupuestos sin responder</span>
         </div>
 
         <div class="cifra">
@@ -115,19 +115,19 @@ interface RiesgoVendedor {
           </table>
         </div>
         <p class="nota apagado">
-          "Presup. enviados" cuenta las oportunidades que pasaron de contactado. Es una
-          aproximaci&oacute;n: no se guarda el historial de cambios de etapa.
+          "Presup. enviados" cuenta todos los presupuestos que emiti&oacute; cada vendedor,
+          hayan terminado en venta o no.
         </p>
       </section>
 
       <section class="caja bloque">
-        <h3>Oportunidades por etapa</h3>
+        <h3>Pedidos por estado</h3>
         <div class="etapas">
-          @for (e of ETAPAS; track e.valor) {
+          @for (e of ESTADOS; track e.valor) {
             <div class="etapa">
               <span class="nombre-etapa">{{ e.texto }}</span>
-              <span class="valor-etapa num">{{ etapaDe(e.valor).cantidad }}</span>
-              <span class="monto-etapa num apagado">{{ moneda(etapaDe(e.valor).monto_total) }}</span>
+              <span class="valor-etapa num">{{ estadoDe(e.valor).cantidad }}</span>
+              <span class="monto-etapa num apagado">{{ moneda(estadoDe(e.valor).monto_total) }}</span>
             </div>
           }
         </div>
@@ -265,18 +265,17 @@ interface RiesgoVendedor {
 export class Panel {
   private readonly api = inject(Api);
 
-  protected readonly ETAPAS = [
-    { valor: 'nuevo', texto: 'Nuevo' },
-    { valor: 'contactado', texto: 'Contactado' },
-    { valor: 'presupuesto_enviado', texto: 'Presupuesto' },
-    { valor: 'negociacion', texto: 'Negociacion' },
-    { valor: 'ganado', texto: 'Ganado' },
+  protected readonly ESTADOS = [
+    { valor: 'presupuesto', texto: 'Presupuesto' },
+    { valor: 'confirmado', texto: 'Confirmado' },
+    { valor: 'entregado', texto: 'Entregado' },
     { valor: 'perdido', texto: 'Perdido' },
+    { valor: 'anulado', texto: 'Anulado' },
   ] as const;
 
   protected readonly resumen = signal<Resumen | null>(null);
   protected readonly porVendedor = signal<PorVendedor[]>([]);
-  protected readonly porEtapa = signal<PorEtapa[]>([]);
+  protected readonly porEstado = signal<PorEstado[]>([]);
   protected readonly riesgoPorVendedor = signal<RiesgoVendedor[]>([]);
   protected readonly cargando = signal(true);
   protected readonly error = signal('');
@@ -289,8 +288,8 @@ export class Panel {
     return '$ ' + Math.round(valor).toLocaleString('es-UY');
   }
 
-  protected etapaDe(etapa: string): PorEtapa {
-    return this.porEtapa().find((e) => e.etapa === etapa) ?? { etapa, cantidad: 0, monto_total: 0 };
+  protected estadoDe(estado: string): PorEstado {
+    return this.porEstado().find((e) => e.estado === estado) ?? { estado, cantidad: 0, monto_total: 0 };
   }
 
   protected riesgoDe(vendedorId: number): number {
@@ -304,12 +303,12 @@ export class Panel {
       const r = await this.api.get<{
         resumen: Resumen;
         por_vendedor: PorVendedor[];
-        por_etapa: PorEtapa[];
+        por_estado: PorEstado[];
         riesgo_por_vendedor: RiesgoVendedor[];
       }>('/dashboard');
       this.resumen.set(r.resumen);
       this.porVendedor.set(r.por_vendedor);
-      this.porEtapa.set(r.por_etapa);
+      this.porEstado.set(r.por_estado);
       this.riesgoPorVendedor.set(r.riesgo_por_vendedor);
     } catch (e) {
       this.error.set(mensajeDeError(e, 'No se pudo cargar el panel'));

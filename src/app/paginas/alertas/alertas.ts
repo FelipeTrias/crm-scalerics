@@ -11,7 +11,7 @@ interface Alerta {
   nombre_fantasia: string | null;
   vendedor_id: number;
   vendedor_nombre: string;
-  tipo: 'sin_contacto' | 'sin_compra' | 'oportunidad_estancada';
+  tipo: 'sin_contacto' | 'sin_compra';
   dias_sin_contacto: number | null;
   mensaje: string | null;
   estado: 'pendiente' | 'vista' | 'resuelta';
@@ -199,7 +199,6 @@ export class Alertas {
 
   protected etiquetaTipo(tipo: Alerta['tipo']): string {
     if (tipo === 'sin_compra') return 'Dejo de comprar';
-    if (tipo === 'oportunidad_estancada') return 'Oportunidad estancada';
     return 'Sin contacto';
   }
 

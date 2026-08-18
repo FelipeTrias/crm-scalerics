@@ -28,7 +28,7 @@ interface Renglon {
   template: `
     <div class="titulo">
       <div>
-        <h2>Registrar pedido</h2>
+        <h2>{{ estado === 'presupuesto' ? 'Nuevo presupuesto' : 'Registrar pedido' }}</h2>
         <p class="secundario">{{ nombreCliente() || 'Cargando...' }}</p>
       </div>
       <a class="boton secundario" [routerLink]="['/clientes', id()]">Cancelar</a>
@@ -127,7 +127,8 @@ interface Renglon {
           <div class="campo">
             <label class="etiqueta" for="estado">Estado</label>
             <select id="estado" name="estado" [(ngModel)]="estado">
-              <option value="pendiente">Pendiente de entrega</option>
+              <option value="presupuesto">Presupuesto &mdash; todav&iacute;a no compr&oacute;</option>
+              <option value="confirmado">Confirmado &mdash; ya lo pidi&oacute;</option>
               <option value="entregado">Entregado</option>
             </select>
           </div>
@@ -142,7 +143,7 @@ interface Renglon {
         </div>
 
         <button type="button" class="boton guardar" (click)="guardar()" [disabled]="renglones().length === 0 || guardando()">
-          {{ guardando() ? 'Guardando...' : 'Guardar pedido &mdash; ' + moneda(total()) }}
+          {{ guardando() ? 'Guardando...' : 'Guardar &mdash; ' + moneda(total()) }}
         </button>
       </section>
     </div>
@@ -390,7 +391,8 @@ export class NuevoPedido {
   protected readonly guardando = signal(false);
   protected readonly error = signal('');
 
-  protected estado = 'pendiente';
+  // Arranca como presupuesto: primero se cotiza y despues se confirma.
+  protected estado = 'presupuesto';
   protected fecha = '';
   protected notas = '';
 
