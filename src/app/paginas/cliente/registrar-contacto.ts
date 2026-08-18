@@ -1,0 +1,234 @@
+import { Component, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { Api, mensajeDeError } from '../../nucleo/api';
+
+/**
+ * Registro de un contacto con el cliente.
+ *
+ * Este formulario decide si el sistema se usa o no. El vendedor lo completa
+ * parado en la calle, con una mano, entre dos visitas. Tiene que llevarle
+ * menos de 15 segundos.
+ *
+ * Por eso: cuatro campos, uno solo obligatorio, el tipo se elige de un toque
+ * con botones grandes y el resto son listas desplegables con lo que se contesta
+ * siempre. Escribir a mano es opcional. Si el formulario crece, nadie lo llena
+ * y el CRM vuelve a ser el Excel de cada uno.
+ */
+@Component({
+  selector: 'app-registrar-contacto',
+  imports: [FormsModule],
+  template: `
+    <dialog #dlg (close)="cerrado()">
+      <form class="formulario" (ngSubmit)="guardar()">
+        <h2>Registrar contacto</h2>
+
+        @if (error()) {
+          <p class="error" role="alert">{{ error() }}</p>
+        }
+
+        <div class="campo">
+          <span class="etiqueta">&iquest;Qu&eacute; hiciste?</span>
+          <div class="tipos">
+            @for (t of TIPOS; track t.valor) {
+              <button
+                type="button"
+                class="tipo"
+                [class.elegido]="tipo() === t.valor"
+                [attr.aria-pressed]="tipo() === t.valor"
+                (click)="tipo.set(t.valor)"
+              >
+                {{ t.texto }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="campo">
+          <label class="etiqueta" for="resultado">C&oacute;mo sali&oacute;</label>
+          <select id="resultado" name="resultado" [(ngModel)]="resultado">
+            <option value="">Sin especificar</option>
+            @for (r of RESULTADOS; track r) {
+              <option [value]="r">{{ r }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="campo">
+          <label class="etiqueta" for="notas">Notas <span class="apagado">(opcional)</span></label>
+          <textarea id="notas" name="notas" rows="2" [(ngModel)]="notas"></textarea>
+        </div>
+
+        <div class="campo">
+          <label class="etiqueta" for="proxima">Pr&oacute;xima acci&oacute;n <span class="apagado">(opcional)</span></label>
+          <select id="proxima" name="proxima" [(ngModel)]="proximaAccion">
+            <option value="">Nada pendiente</option>
+            @for (p of PROXIMAS; track p) {
+              <option [value]="p">{{ p }}</option>
+            }
+          </select>
+          @if (proximaAccion) {
+            <input type="date" name="proximaFecha" aria-label="Fecha de la proxima accion" [(ngModel)]="proximaFecha" />
+          }
+        </div>
+
+        <div class="acciones">
+          <button type="button" class="boton secundario" (click)="cerrar()" [disabled]="guardando()">
+            Cancelar
+          </button>
+          <button type="submit" class="boton" [disabled]="guardando()">
+            {{ guardando() ? 'Guardando...' : 'Guardar' }}
+          </button>
+        </div>
+      </form>
+    </dialog>
+  `,
+  styles: `
+    dialog {
+      width: min(480px, calc(100% - 24px));
+      padding: 0;
+      border: 1px solid var(--borde);
+      border-radius: 12px;
+      background: var(--superficie);
+      color: var(--texto);
+    }
+
+    dialog::backdrop {
+      background: rgb(11 37 69 / 0.45);
+    }
+
+    .formulario {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 18px;
+    }
+
+    .tipos {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+
+    .tipo {
+      min-height: 52px;
+      padding: 0 4px;
+      border: 1px solid var(--borde);
+      border-radius: var(--radio);
+      background: var(--superficie);
+      color: var(--texto);
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .tipo.elegido {
+      background: var(--azul-700);
+      border-color: var(--azul-700);
+      color: #fff;
+    }
+
+    .acciones {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .acciones .boton {
+      flex: 1;
+    }
+
+    @media (max-width: 760px) {
+      dialog {
+        width: 100%;
+        max-width: none;
+        margin: auto auto 0;
+        border-radius: 12px 12px 0 0;
+      }
+    }
+  `,
+})
+export class RegistrarContacto {
+  private readonly api = inject(Api);
+
+  readonly clienteId = input.required<number>();
+  readonly registrado = output<void>();
+
+  private readonly dlg = viewChild.required<ElementRef<HTMLDialogElement>>('dlg');
+
+  protected readonly TIPOS = [
+    { valor: 'llamada', texto: 'Llamada' },
+    { valor: 'visita', texto: 'Visita' },
+    { valor: 'whatsapp', texto: 'WhatsApp' },
+    { valor: 'email', texto: 'Email' },
+  ] as const;
+
+  protected readonly RESULTADOS = [
+    'Pedido confirmado',
+    'Renovo pedido mensual',
+    'Quedo en confirmar',
+    'Pidio presupuesto',
+    'Pidio muestra',
+    'Solo consulta de precios',
+    'No estaba el encargado',
+    'Reclamo por entrega',
+    'Sin respuesta',
+    'Reprogramo la visita',
+  ];
+
+  protected readonly PROXIMAS = [
+    'Llamar para cerrar el pedido',
+    'Pasar a dejar muestras',
+    'Enviar presupuesto actualizado',
+    'Visitar para relevar consumo',
+    'Confirmar fecha de entrega',
+  ];
+
+  protected readonly tipo = signal<string>('llamada');
+  protected resultado = '';
+  protected notas = '';
+  protected proximaAccion = '';
+  protected proximaFecha = '';
+
+  protected readonly guardando = signal(false);
+  protected readonly error = signal('');
+
+  abrir(): void {
+    this.tipo.set('llamada');
+    this.resultado = '';
+    this.notas = '';
+    this.proximaAccion = '';
+    this.proximaFecha = '';
+    this.error.set('');
+    this.dlg().nativeElement.showModal();
+  }
+
+  protected cerrar(): void {
+    this.dlg().nativeElement.close();
+  }
+
+  protected cerrado(): void {
+    this.guardando.set(false);
+  }
+
+  protected async guardar(): Promise<void> {
+    if (this.guardando()) return;
+    this.guardando.set(true);
+    this.error.set('');
+    try {
+      await this.api.post(`/clientes/${this.clienteId()}/interacciones`, {
+        tipo: this.tipo(),
+        resultado: this.resultado || null,
+        notas: this.notas || null,
+        proxima_accion: this.proximaAccion || null,
+        proxima_accion_fecha: this.proximaAccion ? this.proximaFecha || null : null,
+      });
+      this.cerrar();
+      this.registrado.emit();
+    } catch (e) {
+      this.error.set(mensajeDeError(e, 'No se pudo registrar el contacto'));
+    } finally {
+      this.guardando.set(false);
+    }
+  }
+}

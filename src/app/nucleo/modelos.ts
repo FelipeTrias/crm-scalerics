@@ -48,3 +48,30 @@ export interface Interaccion {
   usuario_id: number;
   usuario_nombre: string;
 }
+
+export interface Oportunidad {
+  id: number;
+  titulo: string;
+  monto_estimado: number | null;
+  moneda: 'UYU' | 'USD';
+  etapa: 'nuevo' | 'contactado' | 'presupuesto_enviado' | 'negociacion' | 'ganado' | 'perdido';
+  fecha_cierre_estimada: string | null;
+  fecha_cierre_real: string | null;
+  motivo_perdida: string | null;
+}
+
+/** Respuesta de GET /api/clientes/:id */
+export interface FichaCliente {
+  cliente: Cliente;
+  contactos: Contacto[];
+  interacciones: Interaccion[];
+  oportunidades: Oportunidad[];
+}
+
+export interface Vendedor {
+  id: number;
+  nombre: string;
+  email: string;
+  activo: number;
+  clientes: number;
+}

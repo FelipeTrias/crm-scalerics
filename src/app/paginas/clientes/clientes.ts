@@ -1,5 +1,6 @@
 import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { Api, mensajeDeError } from '../../nucleo/api';
 import { colorCompra, colorContacto, normalizar } from '../../nucleo/formato';
 import type { Cliente } from '../../nucleo/modelos';
@@ -7,11 +8,12 @@ import { Sesion } from '../../nucleo/sesion';
 
 @Component({
   selector: 'app-clientes',
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   template: `
     <div class="titulo">
       <h2>{{ sesion.esAdmin() ? 'Todos los clientes' : 'Mi cartera' }}</h2>
       <span class="apagado num">{{ leyenda() }}</span>
+      <a class="boton nuevo" routerLink="/clientes/nuevo">Nuevo cliente</a>
     </div>
 
     <input
@@ -58,7 +60,9 @@ import { Sesion } from '../../nucleo/sesion';
               @for (c of visibles(); track c.id) {
                 <tr>
                   <td>
-                    <div class="principal">{{ c.nombre_fantasia || c.razon_social }}</div>
+                    <a class="enlace" [routerLink]="['/clientes', c.id]">
+                      <span class="principal">{{ c.nombre_fantasia || c.razon_social }}</span>
+                    </a>
                     <div class="secundario">{{ c.razon_social }}</div>
                   </td>
                   <td>{{ c.ciudad || '—' }}</td>
@@ -90,7 +94,7 @@ import { Sesion } from '../../nucleo/sesion';
       <!-- Celular: tarjetas apiladas -->
       <div class="tarjetas solo-celular">
         @for (c of visibles(); track c.id) {
-          <article class="tarjeta">
+          <a class="tarjeta" [routerLink]="['/clientes', c.id]">
             <div class="arriba">
               <div>
                 <div class="principal">{{ c.nombre_fantasia || c.razon_social }}</div>
@@ -113,7 +117,7 @@ import { Sesion } from '../../nucleo/sesion';
                 </span>
               }
             </div>
-          </article>
+          </a>
         }
       </div>
     }
@@ -133,6 +137,26 @@ import { Sesion } from '../../nucleo/sesion';
 
     .error {
       margin-bottom: 12px;
+    }
+
+    .nuevo {
+      margin-left: auto;
+    }
+
+    .enlace {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .enlace:hover .principal {
+      color: var(--azul-700);
+      text-decoration: underline;
+    }
+
+    /* En el celular la tarjeta entera es el area tactil */
+    a.tarjeta {
+      color: inherit;
+      text-decoration: none;
     }
 
     .solo-celular {
