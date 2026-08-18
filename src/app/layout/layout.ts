@@ -5,40 +5,98 @@ import { Sesion } from '../nucleo/sesion';
 /**
  * Armazon de la aplicacion.
  *
- * En escritorio la navegacion va arriba; en celular pasa a una barra fija
- * abajo, que es donde llega el pulgar. Los vendedores la usan parados en la
- * calle y con una sola mano.
+ * En escritorio la navegacion es una barra lateral con icono y nombre. En
+ * celular NO se convierte en un cajon lateral: pasa a una barra fija abajo,
+ * que es donde llega el pulgar. Los vendedores la usan parados en la calle y
+ * con una sola mano; un menu lateral obligaria a dos toques y a estirar el
+ * dedo hasta arriba para abrirlo.
+ *
+ * Los nombres son los del negocio: "Mi cartera", "Pedidos", "Catalogo".
+ * Nada de "pipeline" ni "dashboard".
  */
 @Component({
   selector: 'app-layout',
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
   template: `
-    <header class="barra">
-      <div class="logo" aria-hidden="true">S</div>
+    <aside class="lateral">
       <div class="marca">
-        <strong>Scalerics</strong>
-        <span>Insumos de limpieza</span>
+        <div class="logo" aria-hidden="true">S</div>
+        <div class="nombre">
+          <strong>Scalerics</strong>
+          <span>Insumos de limpieza</span>
+        </div>
       </div>
-      <div class="usuario">
-        <span class="nombre">{{ sesion.usuario()?.nombre }}</span>
-        <button type="button" class="salir" (click)="salir()">Salir</button>
-      </div>
-    </header>
 
-    <nav class="nav-escritorio">
-      <a routerLink="/clientes" routerLinkActive="activo">Mi cartera</a>
-      <a routerLink="/riesgo" routerLinkActive="activo">En riesgo</a>
-      <a routerLink="/pipeline" routerLinkActive="activo">Pipeline</a>
-      <a routerLink="/alertas" routerLinkActive="activo">Alertas</a>
-      <a routerLink="/productos" routerLinkActive="activo">Catalogo</a>
-      @if (sesion.esAdmin()) {
-        <a routerLink="/panel" routerLinkActive="activo">Panel</a>
-      }
-    </nav>
+      <nav>
+        <a routerLink="/clientes" routerLinkActive="activo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <path d="M3 7h18v12H3z" />
+            <path d="M8 7V5h8v2" />
+          </svg>
+          Mi cartera
+        </a>
+        <a routerLink="/riesgo" routerLinkActive="activo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <path d="M12 4l9 16H3z" />
+            <path d="M12 10v4" />
+            <path d="M12 17h.01" />
+          </svg>
+          En riesgo
+        </a>
+        <a routerLink="/pedidos" routerLinkActive="activo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <path d="M8 4h9a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2h1z" />
+            <path d="M9 3h6v3H9z" />
+            <path d="M9 11h6" />
+            <path d="M9 15h4" />
+          </svg>
+          Pedidos
+        </a>
+        <a routerLink="/alertas" routerLinkActive="activo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <path d="M18 8a6 6 0 10-12 0c0 7-3 8-3 8h18s-3-1-3-8" />
+            <path d="M10 21h4" />
+          </svg>
+          Alertas
+        </a>
+        <a routerLink="/productos" routerLinkActive="activo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <path d="M4 7l8-4 8 4v10l-8 4-8-4z" />
+            <path d="M4 7l8 4 8-4" />
+            <path d="M12 11v10" />
+          </svg>
+          Cat&aacute;logo
+        </a>
+        @if (sesion.esAdmin()) {
+          <a routerLink="/panel" routerLinkActive="activo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+              <path d="M4 19V9" />
+              <path d="M10 19V5" />
+              <path d="M16 19v-7" />
+              <path d="M22 19H2" />
+            </svg>
+            Panel
+          </a>
+        }
+      </nav>
+    </aside>
 
-    <main class="contenido">
-      <router-outlet />
-    </main>
+    <div class="principal">
+      <header class="barra">
+        <div class="marca-chica">
+          <div class="logo" aria-hidden="true">S</div>
+          <strong>Scalerics</strong>
+        </div>
+        <div class="usuario">
+          <span class="nombre-usuario">{{ sesion.usuario()?.nombre }}</span>
+          <button type="button" class="salir" (click)="salir()">Salir</button>
+        </div>
+      </header>
+
+      <main class="contenido">
+        <router-outlet />
+      </main>
+    </div>
 
     <nav class="nav-celular">
       <a routerLink="/clientes" routerLinkActive="activo">
@@ -56,14 +114,13 @@ import { Sesion } from '../nucleo/sesion';
         </svg>
         En riesgo
       </a>
-      <a routerLink="/pipeline" routerLinkActive="activo">
+      <a routerLink="/pedidos" routerLinkActive="activo">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-          <path d="M4 19V9" />
-          <path d="M10 19V5" />
-          <path d="M16 19v-7" />
-          <path d="M22 19H2" />
+          <path d="M8 4h9a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2h1z" />
+          <path d="M9 3h6v3H9z" />
+          <path d="M9 11h6" />
         </svg>
-        Pipeline
+        Pedidos
       </a>
       <a routerLink="/alertas" routerLinkActive="activo">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
@@ -75,10 +132,10 @@ import { Sesion } from '../nucleo/sesion';
       @if (sesion.esAdmin()) {
         <a routerLink="/panel" routerLinkActive="activo">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-            <path d="M3 3h8v8H3z" />
-            <path d="M13 3h8v5h-8z" />
-            <path d="M13 12h8v9h-8z" />
-            <path d="M3 15h8v6H3z" />
+            <path d="M4 19V9" />
+            <path d="M10 19V5" />
+            <path d="M16 19v-7" />
+            <path d="M22 19H2" />
           </svg>
           Panel
         </a>
@@ -87,41 +144,54 @@ import { Sesion } from '../nucleo/sesion';
   `,
   styles: `
     :host {
-      display: flex;
-      flex-direction: column;
+      display: grid;
+      grid-template-columns: 232px 1fr;
       min-height: 100dvh;
     }
 
-    .barra {
+    /* ─────────────────────── Barra lateral ─────────────────────── */
+
+    .lateral {
+      position: sticky;
+      top: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      height: 100dvh;
+      padding: 14px 10px;
+      background: var(--azul-900);
+      color: #fff;
+      overflow-y: auto;
+    }
+
+    .marca {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 10px var(--margen-lateral);
-      background: var(--azul-900);
-      color: #fff;
+      padding: 4px 8px 14px;
     }
 
     /* Espacio reservado: el logo real lo manda el cliente */
     .logo {
       display: grid;
       place-items: center;
-      width: 34px;
-      height: 34px;
+      width: 36px;
+      height: 36px;
       flex: none;
       border-radius: 50%;
       background: var(--azul-500);
       font-weight: 700;
     }
 
-    .marca {
+    .marca .nombre {
       display: flex;
       flex-direction: column;
       line-height: 1.15;
-      margin-right: auto;
+      min-width: 0;
     }
 
     .marca strong {
-      font-size: 0.95rem;
+      font-size: 0.98rem;
       font-weight: 650;
       letter-spacing: -0.01em;
     }
@@ -131,56 +201,99 @@ import { Sesion } from '../nucleo/sesion';
       color: #a9c2dd;
     }
 
+    .lateral nav {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .lateral nav a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 44px;
+      padding: 0 10px;
+      border-radius: var(--radio);
+      color: #c8dcef;
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 550;
+    }
+
+    .lateral nav a:hover {
+      background: rgb(255 255 255 / 0.08);
+      color: #fff;
+    }
+
+    .lateral nav a.activo {
+      background: var(--azul-500);
+      color: #fff;
+      font-weight: 650;
+    }
+
+    .lateral nav svg {
+      width: 19px;
+      height: 19px;
+      flex: none;
+    }
+
+    /* ─────────────────────── Columna principal ─────────────────────── */
+
+    .principal {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .barra {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 10px var(--margen-lateral);
+      background: var(--superficie);
+      border-bottom: 1px solid var(--borde);
+    }
+
+    .marca-chica {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      margin-right: auto;
+    }
+
+    .marca-chica .logo {
+      width: 32px;
+      height: 32px;
+      font-size: 0.9rem;
+    }
+
     .usuario {
       display: flex;
       align-items: center;
       gap: 10px;
-      font-size: 0.82rem;
+      font-size: 0.85rem;
     }
 
-    .usuario .nombre {
-      color: #d6e4f2;
+    .nombre-usuario {
+      color: var(--texto-suave);
     }
 
     .salir {
       min-height: 36px;
       padding: 0 12px;
-      border: 1px solid rgb(255 255 255 / 0.28);
+      border: 1px solid var(--borde);
       border-radius: 6px;
-      background: transparent;
-      color: #fff;
+      background: var(--superficie);
+      color: var(--texto);
       font: inherit;
-      font-size: 0.8rem;
+      font-size: 0.82rem;
+      font-weight: 600;
       cursor: pointer;
     }
 
     .salir:hover {
-      background: rgb(255 255 255 / 0.1);
-    }
-
-    .nav-escritorio {
-      display: flex;
-      gap: 2px;
-      padding: 0 var(--margen-lateral);
-      background: var(--azul-700);
-    }
-
-    .nav-escritorio a {
-      padding: 9px 14px;
-      color: #c8dcef;
-      text-decoration: none;
-      font-size: 0.85rem;
-      font-weight: 550;
-      border-bottom: 3px solid transparent;
-    }
-
-    .nav-escritorio a:hover {
-      color: #fff;
-    }
-
-    .nav-escritorio a.activo {
-      color: #fff;
-      border-bottom-color: #fff;
+      background: var(--gris-100);
     }
 
     .contenido {
@@ -188,6 +301,8 @@ import { Sesion } from '../nucleo/sesion';
       width: 100%;
       padding: 16px var(--margen-lateral) 24px;
     }
+
+    /* ─────────────────────── Celular ─────────────────────── */
 
     .nav-celular {
       display: none;
@@ -220,8 +335,12 @@ import { Sesion } from '../nucleo/sesion';
       height: 20px;
     }
 
-    @media (max-width: 760px) {
-      .nav-escritorio {
+    @media (max-width: 900px) {
+      :host {
+        grid-template-columns: 1fr;
+      }
+
+      .lateral {
         display: none;
       }
 
@@ -229,19 +348,32 @@ import { Sesion } from '../nucleo/sesion';
         display: flex;
       }
 
-      .marca span,
-      .usuario .nombre {
+      /* Sin barra lateral, la marca vuelve al encabezado */
+      .barra {
+        padding: 10px 12px;
+        background: var(--azul-900);
+        border-bottom: 0;
+        color: #fff;
+      }
+
+      .marca-chica {
+        display: flex;
+      }
+
+      .nombre-usuario {
         display: none;
       }
 
-      /* En el celular se toca con el dedo: minimo 44px (CLAUDE.md seccion 7) */
       .salir {
         min-height: 44px;
         padding: 0 14px;
+        border-color: rgb(255 255 255 / 0.28);
+        background: transparent;
+        color: #fff;
       }
 
-      .barra {
-        padding: 10px 12px;
+      .salir:hover {
+        background: rgb(255 255 255 / 0.1);
       }
 
       .contenido {

@@ -40,8 +40,8 @@ export const routes: Routes = [
         loadComponent: () => import('./paginas/riesgo/riesgo').then((m) => m.Riesgo),
       },
       {
-        path: 'pipeline',
-        loadComponent: () => import('./paginas/pipeline/pipeline').then((m) => m.Pipeline),
+        path: 'pedidos',
+        loadComponent: () => import('./paginas/tablero/tablero').then((m) => m.Tablero),
       },
       {
         path: 'productos',

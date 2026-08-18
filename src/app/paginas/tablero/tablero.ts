@@ -27,7 +27,7 @@ interface ResumenEstado {
 }
 
 /**
- * Pipeline de ventas.
+ * Tablero de pedidos.
  *
  * Responde a "hoy eso me lo dicen de palabra en la reunion de los lunes y
  * siempre esta todo en proceso, nunca se bien".
@@ -41,11 +41,11 @@ interface ResumenEstado {
  * el dedo, que es donde se usa, y no suma dependencias.
  */
 @Component({
-  selector: 'app-pipeline',
+  selector: 'app-tablero',
   imports: [FormsModule, RouterLink],
   template: `
     <div class="titulo">
-      <h2>Pipeline</h2>
+      <h2>Pedidos</h2>
       <span class="apagado num">
         {{ resumenDe('presupuesto').cantidad }} presupuestos sin responder &middot;
         {{ moneda(resumenDe('presupuesto').monto_total) }}
@@ -57,7 +57,7 @@ interface ResumenEstado {
     }
 
     @if (cargando()) {
-      <p class="vacio">Cargando pipeline...</p>
+      <p class="vacio">Cargando pedidos...</p>
     } @else {
       <div class="tablero desplazable">
         @for (e of ESTADOS; track e.valor) {
@@ -263,7 +263,7 @@ interface ResumenEstado {
     }
   `,
 })
-export class Pipeline {
+export class Tablero {
   private readonly api = inject(Api);
   protected readonly sesion = inject(Sesion);
 
@@ -334,7 +334,7 @@ export class Pipeline {
       this.resumen.set(r.resumen);
       this.diasCerrados.set(r.dias_cerrados);
     } catch (e) {
-      this.error.set(mensajeDeError(e, 'No se pudo cargar el pipeline'));
+      this.error.set(mensajeDeError(e, 'No se pudieron cargar los pedidos'));
     } finally {
       this.cargando.set(false);
     }

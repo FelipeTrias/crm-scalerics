@@ -71,8 +71,8 @@ interface RiesgoVendedor {
 
         <div class="cifra">
           <span class="valor num">{{ moneda(r.monto_en_pipeline) }}</span>
-          <span class="etiqueta">En el pipeline</span>
-          <span class="detalle apagado">Presupuestos sin responder</span>
+          <span class="etiqueta">Presupuestado</span>
+          <span class="detalle apagado">Esperando respuesta</span>
         </div>
 
         <div class="cifra">
