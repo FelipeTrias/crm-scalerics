@@ -38,16 +38,17 @@ No es "falta un Excel mejor". Es que **la cartera de clientes hoy es propiedad d
 - Desplegado y funcionando en **https://crm-scalerics.felipetrias.workers.dev**
 - Repo en GitHub: `FelipeTrias/crm-scalerics`, rama `main`
 - Deploy **manual**: `npm run deploy` (corre `ng build` y despues `wrangler deploy`)
+- Node **24.19.0** via nvm-windows. Con Node 20 no compila: Angular 22 pide >= 22.22.3
+- Base D1 `scalerics-crm` con el schema aplicado en local y en remoto (`db/schema.sql`)
+- Seed con datos del rubro: `db/seed.sql`, generado por `db/generar-seed.ts`
+- API completa en el Worker: 21 endpoints, con el filtro por rol verificado
+- `scripts/verificar-seguridad.sh`: 42 comprobaciones de permisos, pasan en produccion
 
 ⬜ Pendiente:
 
-1. Base de datos D1 + schema
-2. Datos de prueba realistas (seed)
-3. API en el Worker
-4. Pantallas en Angular
-5. Motor de alertas (cron trigger)
-6. Reasignacion de cartera entre vendedores
-7. README y cierre
+1. Pantallas en Angular
+2. Motor de alertas (cron trigger)
+3. README y cierre
 
 > ⚠️ **No hay CI.** El repo no tiene `.github/workflows/` y nunca lo tuvo.
 > Cada deploy se dispara a mano. Si algun dia se agrega, actualizar esta seccion.
@@ -147,6 +148,36 @@ Firmar el JWT requiere un secreto. **No va hardcodeado en el codigo ni commitead
 
 Se lee como `env.JWT_SECRET`. Si falta, el login tiene que fallar con un error claro
 — nunca caer a un valor por defecto.
+
+### Imports dentro de `src/`: sin extension `.ts`
+
+Angular rechaza los imports con extension (`TS5097: An import path can only end
+with a '.ts' extension when 'allowImportingTsExtensions' is enabled`).
+
+Pero `db/generar-seed.ts` **si la lleva**, porque lo corre Node directo y el type
+stripping la exige. No se pisan: `tsconfig.app.json` solo incluye `src/**`, asi
+que TypeScript nunca mira `db/`.
+
+### Los tipos del Worker hay que sumarlos al tsconfig
+
+`worker-configuration.d.ts` esta en la raiz, fuera del `include` de
+`tsconfig.app.json`. Sin agregarlo, `Env`, `D1Database` y `ExecutionContext` no
+existen para `ng build` y el Worker no compila.
+
+### `reqHandler` recibe un solo argumento
+
+El scaffold hacia `export default { fetch: reqHandler }` y wrangler lo llamaba con
+`(request, env, ctx)`; los dos extra se ignoraban. Su firma real es
+`(request: Request) => Promise<Response | null>`. Al llamarlo a mano va un solo
+argumento, y hay que contemplar el `null`.
+
+### `ng serve` no pasa por el `export default`
+
+O sea que con `ng serve` **no hay `/api`**. Para probar la API:
+
+```
+npm run preview     # ng build + wrangler dev, con binding D1 real
+```
 
 ### SSR y APIs del navegador
 
@@ -422,7 +453,20 @@ Lo que sí se hace:
 
 ---
 
-## 9. Convenciones de trabajo
+## 9. Trampas del entorno (Windows)
+
+Dos que ya costaron tiempo:
+
+- **`>>` de PowerShell escribe UTF-16LE.** Un `.dev.vars` generado asi arranca con
+  el BOM `ff fe` y wrangler no lo puede leer, sin ningun mensaje de error. Verificar
+  con `head -c 2 archivo | od -t x1`.
+- **`wrangler d1 execute --command` con saltos de linea falla en silencio.** Devuelve
+  algo que no es el JSON esperado y no ejecuta nada. Las consultas van en una sola
+  linea, o en un archivo con `--file`.
+
+---
+
+## 10. Convenciones de trabajo
 
 ### Commits
 
@@ -452,7 +496,7 @@ Commit cada vez que algo empieza a funcionar. Un historial que cuenta una histor
 
 ---
 
-## 10. Prioridades si falta tiempo
+## 11. Prioridades si falta tiempo
 
 Orden de sacrificio, primero lo que se corta antes:
 
